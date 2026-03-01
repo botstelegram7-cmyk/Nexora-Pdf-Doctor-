@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: pdf-doctor-bot
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+
+    envVars:
+      # ── REQUIRED ────────────────────────────────────────────────────────────
+      - key: BOT_TOKEN
+        sync: false          # Set manually in Render dashboard
+
+      - key: OWNER_ID
+        sync: false          # Your Telegram User ID
+
+      # ── OPTIONAL — Payment ──────────────────────────────────────────────────
+      - key: UPI_ID
+        sync: false          # e.g. yourname@paytm (leave empty to hide)
+
+      - key: UPI_QR_URL
+        sync: false          # URL or Telegram file_id of UPI QR image (optional)
+
+      # ── OPTIONAL — Start Media ───────────────────────────────────────────────
+      - key: START_IMAGE
+        sync: false          # URL or file_id of welcome image/gif (optional)
+
+      # ── OPTIONAL — Database ─────────────────────────────────────────────────
+      - key: MONGODB_URL
+        sync: false          # MongoDB connection string (optional, SQLite used if empty)
+
+      # ── Auto set by Render ───────────────────────────────────────────────────
+      - key: PORT
+        value: "8080"
