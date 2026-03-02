@@ -1,57 +1,57 @@
 """
-Font downloader — runs at startup to ensure handwriting fonts exist.
-Falls back to a bundled minimal TTF if download fails.
+Font Loader v3 — Downloads all handwriting fonts from Google Fonts
 """
-import os, io, logging, requests
+import os
+import requests
+import logging
 
 logger = logging.getLogger(__name__)
 
-FONTS_DIR = "fonts"
-os.makedirs(FONTS_DIR, exist_ok=True)
-
 FONT_URLS = {
-    "Caveat.ttf":           "https://github.com/google/fonts/raw/main/ofl/caveat/static/Caveat-Regular.ttf",
-    "DancingScript.ttf":    "https://github.com/google/fonts/raw/main/ofl/dancingscript/static/DancingScript-Regular.ttf",
-    "Kalam.ttf":            "https://github.com/google/fonts/raw/main/ofl/kalam/Kalam-Regular.ttf",
-    "Pacifico.ttf":         "https://github.com/google/fonts/raw/main/ofl/pacifico/Pacifico-Regular.ttf",
-    "Satisfy.ttf":          "https://github.com/google/fonts/raw/main/ofl/satisfy/Satisfy-Regular.ttf",
-    "ShadowsIntoLight.ttf": "https://github.com/google/fonts/raw/main/ofl/shadowsintolight/ShadowsIntoLight-Regular.ttf",
-    "Yellowtail.ttf":       "https://github.com/google/fonts/raw/main/ofl/yellowtail/Yellowtail-Regular.ttf",
-    "Sacramento.ttf":       "https://github.com/google/fonts/raw/main/ofl/sacramento/Sacramento-Regular.ttf",
+    # Original fonts
+    "Caveat.ttf":             "https://github.com/google/fonts/raw/main/ofl/caveat/Caveat%5Bwght%5D.ttf",
+    "DancingScript.ttf":      "https://github.com/google/fonts/raw/main/ofl/dancingscript/DancingScript%5Bwght%5D.ttf",
+    "Kalam.ttf":              "https://github.com/google/fonts/raw/main/ofl/kalam/Kalam-Regular.ttf",
+    "Pacifico.ttf":           "https://github.com/google/fonts/raw/main/ofl/pacifico/Pacifico-Regular.ttf",
+    "Satisfy.ttf":            "https://github.com/google/fonts/raw/main/ofl/satisfy/Satisfy-Regular.ttf",
+    "ShadowsIntoLight.ttf":   "https://github.com/google/fonts/raw/main/ofl/shadowsintolight/ShadowsIntoLight-Regular.ttf",
+    "Yellowtail.ttf":         "https://github.com/google/fonts/raw/main/ofl/yellowtail/Yellowtail-Regular.ttf",
+    "Sacramento.ttf":         "https://github.com/google/fonts/raw/main/ofl/sacramento/Sacramento-Regular.ttf",
+    # New fonts v3
+    "AmaticSC.ttf":           "https://github.com/google/fonts/raw/main/ofl/amaticsc/AmaticSC-Regular.ttf",
+    "IndieFlower.ttf":        "https://github.com/google/fonts/raw/main/ofl/indieflower/IndieFlower-Regular.ttf",
+    "PatrickHand.ttf":        "https://github.com/google/fonts/raw/main/ofl/patrickhand/PatrickHand-Regular.ttf",
+    "Mali.ttf":               "https://github.com/google/fonts/raw/main/ofl/mali/Mali-Regular.ttf",
+    "Courgette.ttf":          "https://github.com/google/fonts/raw/main/ofl/courgette/Courgette-Regular.ttf",
+    "PaytoneOne.ttf":         "https://github.com/google/fonts/raw/main/ofl/paytoneone/PaytoneOne-Regular.ttf",
 }
 
+FONTS_DIR = "fonts"
+
 def download_fonts():
-    """Download all handwriting fonts if not already present."""
-    headers = {"User-Agent": "Mozilla/5.0"}
+    os.makedirs(FONTS_DIR, exist_ok=True)
     for filename, url in FONT_URLS.items():
-        path = os.path.join(FONTS_DIR, filename)
-        if os.path.exists(path) and os.path.getsize(path) > 10_000:
-            logger.info(f"✅ Font exists: {filename}")
+        fpath = os.path.join(FONTS_DIR, filename)
+        if os.path.exists(fpath):
             continue
         try:
-            logger.info(f"⬇️  Downloading font: {filename}")
-            r = requests.get(url, headers=headers, timeout=15)
-            if r.status_code == 200 and len(r.content) > 10_000:
-                with open(path, "wb") as f:
+            logger.info(f"⬇️ Downloading {filename}...")
+            r = requests.get(url, timeout=15)
+            if r.status_code == 200:
+                with open(fpath, "wb") as f:
                     f.write(r.content)
-                logger.info(f"✅ Downloaded: {filename}")
+                logger.info(f"✅ {filename} downloaded")
             else:
-                logger.warning(f"⚠️ Failed ({r.status_code}): {filename}")
+                logger.warning(f"⚠️ Failed {filename}: {r.status_code}")
         except Exception as e:
-            logger.warning(f"⚠️ Font download error {filename}: {e}")
+            logger.warning(f"⚠️ Could not download {filename}: {e}")
 
 def get_font_path(font_key: str) -> str | None:
-    """Return path to font file, or None if not available."""
     from config import FONTS
-    info = FONTS.get(font_key)
-    if not info:
+    font_info = FONTS.get(font_key)
+    if not font_info:
         return None
-    path = info["file"]
-    if os.path.exists(path) and os.path.getsize(path) > 10_000:
+    path = font_info["file"]
+    if os.path.exists(path):
         return path
-    # Try any available font as fallback
-    for filename in FONT_URLS:
-        p = os.path.join(FONTS_DIR, filename)
-        if os.path.exists(p) and os.path.getsize(p) > 10_000:
-            return p
     return None

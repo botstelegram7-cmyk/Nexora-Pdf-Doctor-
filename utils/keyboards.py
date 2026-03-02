@@ -1,10 +1,9 @@
 """
-Keyboards — Beautiful inline UI with emoji decoration.
-Note: Telegram does NOT support custom button colors for regular bots.
-We use rich emoji + symbols to create visual hierarchy.
+Keyboards v3 — Beautiful inline UI with emoji decoration.
+New: language menu, OCR lang, notebook style, new tools.
 """
 from telegram import InlineKeyboardButton as B, InlineKeyboardMarkup as M
-from config import FONTS, BASIC_LABEL, PRO_LABEL
+from config import FONTS, BASIC_LABEL, PRO_LABEL, NOTEBOOK_STYLES, OCR_LANGUAGES
 
 def main_menu():
     return M([
@@ -12,33 +11,50 @@ def main_menu():
         [B("📐 Compress",  callback_data="menu_compress"),
          B("✂️ Split",      callback_data="menu_split"),
          B("🔗 Merge",     callback_data="menu_merge")],
+
         [B("╔══ 🔐 SECURITY ══╗", callback_data="noop")],
         [B("🔒 Lock PDF",   callback_data="do_lock"),
          B("🔓 Unlock PDF", callback_data="do_unlock"),
          B("🧩 Repair",     callback_data="menu_repair")],
+
         [B("╔══ 🎨 VISUAL ══╗", callback_data="noop")],
         [B("🌊 Watermark",  callback_data="menu_watermark"),
          B("🌙 Dark Mode",  callback_data="menu_dark"),
          B("🎨 BG Color",   callback_data="menu_bg")],
+
         [B("╔══ 🔄 CONVERT ══╗", callback_data="noop")],
         [B("🖼️ PDF→Imgs",  callback_data="menu_pdf2img"),
          B("🖼️ Imgs→PDF",  callback_data="menu_img2pdf"),
          B("📊 PDF→Excel", callback_data="menu_excel")],
+        [B("📄 PDF→Word",  callback_data="menu_pdf2word"),
+         B("📊 PDF→PPT",   callback_data="menu_pdf2ppt"),
+         B("🔲 QR Code",   callback_data="menu_qr")],
+
         [B("╔══ ✨ CREATIVE ══╗", callback_data="noop")],
         [B("✍️ Handwriting",  callback_data="menu_hw"),
          B("🔢 Page Nos",    callback_data="menu_pageno"),
          B("📝 Add Text",    callback_data="menu_addtext")],
-        [B("╔══ 🔍 EXTRACT ══╗", callback_data="noop")],
+        [B("✂️ Crop Margins", callback_data="menu_crop"),
+         B("🗂️ Add Footer",  callback_data="menu_footer"),
+         B("🌊 Watermark",   callback_data="menu_watermark")],
+
+        [B("╔══ 🔍 EXTRACT & PAGES ══╗", callback_data="noop")],
         [B("👁️ OCR Text",    callback_data="menu_ocr"),
          B("📋 Metadata",    callback_data="menu_meta"),
          B("🔖 Extract Pgs", callback_data="menu_extract")],
+        [B("🗑️ Delete Pages", callback_data="menu_delete_pages"),
+         B("🔀 Reorder Pages", callback_data="menu_reorder"),
+         B("📏 Resize PDF",  callback_data="menu_resize")],
+
         [B("╔══ ⚙️ MORE TOOLS ══╗", callback_data="noop")],
         [B("🔄 Rotate PDF",  callback_data="menu_rotate"),
-         B("📏 Resize PDF",  callback_data="menu_resize"),
-         B("🗂️ Add Footer",  callback_data="menu_footer")],
+         B("🔒 Lock PDF",    callback_data="do_lock"),
+         B("📋 Metadata",    callback_data="menu_meta")],
+
         [B("╔══ 👤 ACCOUNT ══╗", callback_data="noop")],
         [B("👑 Premium Plans", callback_data="menu_premium"),
-         B("📊 My Account",   callback_data="menu_account")],
+         B("📊 My Account",   callback_data="menu_account"),
+         B("🌍 Language",     callback_data="menu_lang")],
         [B("❓ Help & All Commands", callback_data="menu_help")],
     ])
 
@@ -52,6 +68,40 @@ def font_menu():
         rows.append(row)
     rows.append([B("🔙 Back to Menu", callback_data="back_main")])
     return M(rows)
+
+def notebook_style_menu():
+    rows = [[B("┌─ 📓 CHOOSE NOTEBOOK STYLE ─┐", callback_data="noop")]]
+    items = list(NOTEBOOK_STYLES.items())
+    for i in range(0, len(items), 2):
+        row = []
+        for key, val in items[i:i+2]:
+            row.append(B(val["name"], callback_data=f"nbstyle_{key}"))
+        rows.append(row)
+    rows.append([B("🔙 Back to Menu", callback_data="back_main")])
+    return M(rows)
+
+def ocr_language_menu():
+    rows = [[B("┌─ 🌐 SELECT DOCUMENT LANGUAGE ─┐", callback_data="noop")]]
+    items = list(OCR_LANGUAGES.items())
+    for i in range(0, len(items), 2):
+        row = []
+        for key, val in items[i:i+2]:
+            row.append(B(val["name"], callback_data=f"ocrlang_{key}"))
+        rows.append(row)
+    rows.append([B("🔙 Back", callback_data="back_main")])
+    return M(rows)
+
+def language_menu():
+    return M([
+        [B("┌──── 🌍 CHOOSE BOT LANGUAGE ────┐", callback_data="noop")],
+        [B("🇬🇧 English",  callback_data="setlang_en"),
+         B("🇮🇳 हिंदी",    callback_data="setlang_hi")],
+        [B("🪔 भोजपुरी",   callback_data="setlang_bh"),
+         B("🇪🇸 Español",  callback_data="setlang_es")],
+        [B("🇫🇷 Français", callback_data="setlang_fr"),
+         B("🇰🇷 한국어",   callback_data="setlang_ko")],
+        [B("🔙 Back to Menu", callback_data="back_main")],
+    ])
 
 def watermark_menu():
     return M([
