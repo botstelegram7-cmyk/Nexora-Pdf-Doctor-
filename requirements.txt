@@ -1,33 +1,36 @@
-# Core
+# ── Core ──────────────────────────────────────────────────────────────────────
 python-telegram-bot[webhooks]==21.3
 aiohttp==3.9.5
 python-dotenv==1.0.1
 
-# PDF processing
+# ── PDF Processing ────────────────────────────────────────────────────────────
 PyMuPDF==1.24.5
 pikepdf==9.0.0
 reportlab==4.2.2
 img2pdf==0.5.1
 pdfplumber==0.11.2
 
-# OCR
+# ── OCR ───────────────────────────────────────────────────────────────────────
 pytesseract==0.3.13
 Pillow==10.3.0
 
-# Excel
+# ── Office Formats ────────────────────────────────────────────────────────────
 openpyxl==3.1.5
-
-# Word (DOCX)
 python-docx==1.1.2
-
-# PowerPoint (PPTX)
 python-pptx==0.6.23
 
-# QR Code
+# ── QR Code ───────────────────────────────────────────────────────────────────
 qrcode[pil]==7.4.2
 
-# Database (motor 3.5+ supports pymongo 4.9+)
+# ── Database (optional MongoDB) ───────────────────────────────────────────────
 motor==3.5.0
 pymongo==4.9.2
 
-# NOTE: difflib is Python built-in — DO NOT add it here
+# ── NOTE: These are Python built-ins — DO NOT add them here ──────────────────
+# difflib  ← built-in
+# html     ← built-in
+# ssl      ← built-in
+# urllib   ← built-in
+# gc       ← built-in
+# io       ← built-in
+# os       ← built-in
