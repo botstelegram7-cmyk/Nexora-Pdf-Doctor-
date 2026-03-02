@@ -577,25 +577,38 @@ def get_metadata(data: bytes) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HANDWRITING — FIXED ALIGNMENT + MULTI-STYLE  ✨ UPGRADED
+# HANDWRITING — FIXED ALIGNMENT + MULTI-STYLE + TITLE + TIMESTAMP ✨ UPGRADED
 # ─────────────────────────────────────────────────────────────────────────────
-def create_handwritten_pdf(text: str, font_key: str, notebook_style: str = "classic_blue") -> bytes:
+def create_handwritten_pdf(
+    text: str,
+    font_key: str,
+    notebook_style: str = "classic_blue",
+    title: str = "",
+    credit: str = "Written By - Technical Serena",
+) -> bytes:
     """
-    Create handwritten PDF with proper line alignment (text baseline ON the ruled line).
-    Supports 8 different notebook styles.
+    Create handwritten PDF with:
+    - Proper line alignment (text baseline ON the ruled line)
+    - 8 different notebook styles
+    - Optional Title at top of every page
+    - Timestamp (date & time) at top-right corner of every page
+    - Optional credit text at bottom-right corner
     """
+    import datetime
     from utils.font_loader import get_font_path
 
-    font_path = get_font_path(font_key)
-    style = NOTEBOOK_STYLES.get(notebook_style, NOTEBOOK_STYLES["classic_blue"])
+    font_path  = get_font_path(font_key)
+    style      = NOTEBOOK_STYLES.get(notebook_style, NOTEBOOK_STYLES["classic_blue"])
+    now        = datetime.datetime.now()
+    timestamp  = now.strftime("%d %b %Y  |  %I:%M %p")   # e.g.  02 Mar 2025  |  03:45 PM
 
     buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
-    w, h = A4
+    c   = canvas.Canvas(buf, pagesize=A4)
+    pw, ph = A4   # page width / height
 
-    # Register font
-    font_name = "Helvetica"
-    font_size = 16
+    # ── Register handwriting font ──────────────────────────────────────────
+    font_name  = "Helvetica"
+    font_size  = 16
     if font_path:
         try:
             pdfmetrics.registerFont(TTFont(font_key, font_path))
@@ -604,72 +617,104 @@ def create_handwritten_pdf(text: str, font_key: str, notebook_style: str = "clas
             pass
 
     line_spacing = style["line_spacing"]
-    margin_x = style["margin_x"]
-    is_graph  = style.get("is_graph", False)
-    is_dotted = style.get("is_dotted", False)
+    margin_x     = style["margin_x"]
+    is_graph     = style.get("is_graph",  False)
+    is_dotted    = style.get("is_dotted", False)
+    tc           = style["text_color"]
+    lc           = style["line_color"]
 
-    # ── Notebook background color ─────────────────────────────────
-    def fill_background(c):
+    # ── Background ────────────────────────────────────────────────────────
+    def fill_background(cv):
         bg = style["bg"]
         if isinstance(bg, tuple) and len(bg) == 3:
-            r, g, b = [x/255.0 for x in bg]
-            c.setFillColorRGB(r, g, b)
-            c.rect(0, 0, w, h, fill=1, stroke=0)
+            r, g, b = [x / 255.0 for x in bg]
+            cv.setFillColorRGB(r, g, b)
+            cv.rect(0, 0, pw, ph, fill=1, stroke=0)
 
-    # ── Draw ruled lines ──────────────────────────────────────────
-    def draw_page_lines(c):
-        fill_background(c)
+    # ── Draw title & timestamp header on every page ───────────────────────
+    HEADER_H   = 55   # height reserved at top for title/timestamp area
+    TOP_LINE_Y = ph - HEADER_H - 18  # first ruled line y
 
-        lc = style["line_color"]
-        c.setStrokeColorRGB(*lc)
-        c.setLineWidth(0.4)
+    def draw_header(cv):
+        # Header background strip (subtle, matches style)
+        bg = style["bg"]
+        r0, g0, b0 = [x / 255.0 for x in bg] if isinstance(bg, tuple) else (1, 1, 1)
+        # Slightly darker / contrasting strip
+        cv.setFillColorRGB(
+            max(0, r0 - 0.07),
+            max(0, g0 - 0.07),
+            max(0, b0 - 0.07),
+        )
+        cv.rect(0, ph - HEADER_H, pw, HEADER_H, fill=1, stroke=0)
 
-        # Top margin (where lines start)
-        top_y = h - 72  # First line y position
+        # Title (top-centre, slightly bold look via font size)
+        display_title = title.strip() if title and title.strip() else "Handwritten Notes"
+        cv.setFillColorRGB(*tc)
+        cv.setFont(font_name, 18)
+        title_w = cv.stringWidth(display_title, font_name, 18)
+        cv.drawString((pw - title_w) / 2, ph - 30, display_title)
+
+        # Timestamp (top-right corner, small)
+        cv.setFont("Helvetica", 8)
+        ts_w = cv.stringWidth(timestamp, "Helvetica", 8)
+        cv.setFillColorRGB(min(1, tc[0] + 0.3), min(1, tc[1] + 0.3), min(1, tc[2] + 0.3))
+        cv.drawString(pw - ts_w - 15, ph - 18, timestamp)
+
+        # Thin separator line below header
+        cv.setStrokeColorRGB(*lc)
+        cv.setLineWidth(0.8)
+        cv.line(35, ph - HEADER_H - 2, pw - 35, ph - HEADER_H - 2)
+
+    # ── Draw ruled lines (below header) ──────────────────────────────────
+    def draw_page_lines(cv):
+        fill_background(cv)
+        draw_header(cv)
+
+        cv.setStrokeColorRGB(*lc)
+        cv.setLineWidth(0.4)
 
         if is_graph:
-            # Graph paper: vertical + horizontal grid
-            for y in range(int(top_y), 30, -line_spacing):
-                c.line(35, y, w - 35, y)
-            # Vertical lines
-            for x in range(35, int(w - 35), line_spacing):
-                c.line(x, top_y + 4, x, 30)
+            for y in range(int(TOP_LINE_Y), 30, -line_spacing):
+                cv.line(35, y, pw - 35, y)
+            for x in range(35, int(pw - 35), line_spacing):
+                cv.line(x, TOP_LINE_Y + 4, x, 30)
         elif is_dotted:
-            # Dotted grid
             dot_size = 1.2
-            for y in range(int(top_y), 30, -line_spacing):
-                for x in range(50, int(w - 35), line_spacing):
-                    c.circle(x, y, dot_size, fill=1, stroke=0)
+            for y in range(int(TOP_LINE_Y), 30, -line_spacing):
+                for x in range(50, int(pw - 35), line_spacing):
+                    cv.circle(x, y, dot_size, fill=1, stroke=0)
         else:
-            # Standard ruled lines
-            for y in range(int(top_y), 30, -line_spacing):
-                c.line(35, y, w - 35, y)
-
-            # Margin line (vertical red line on left)
+            for y in range(int(TOP_LINE_Y), 30, -line_spacing):
+                cv.line(35, y, pw - 35, y)
             mc = style.get("margin_color")
             if mc:
-                c.setStrokeColorRGB(*mc)
-                c.setLineWidth(0.7)
-                c.line(margin_x, h - 40, margin_x, 30)
+                cv.setStrokeColorRGB(*mc)
+                cv.setLineWidth(0.7)
+                cv.line(margin_x, ph - HEADER_H - 4, margin_x, 30)
 
-        # Top horizontal border line
-        c.setStrokeColorRGB(*lc)
-        c.setLineWidth(0.5)
-        c.line(35, h - 55, w - 35, h - 55)
+    # ── Credit / branding at bottom-right ────────────────────────────────
+    def draw_credit(cv):
+        if not credit:
+            return
+        cv.setFont("Helvetica-Oblique", 7)
+        cr_color = (min(1, tc[0] + 0.4), min(1, tc[1] + 0.4), min(1, tc[2] + 0.4))
+        cv.setFillColorRGB(*cr_color)
+        cw = cv.stringWidth(credit, "Helvetica-Oblique", 7)
+        cv.drawString(pw - cw - 12, 10, credit)
 
-    # ── Word wrap ─────────────────────────────────────────────────
+    # ── Word wrap ─────────────────────────────────────────────────────────
     def wrap_text(text_content: str) -> list:
-        wrapped = []
+        wrapped  = []
+        max_w    = pw - margin_x - 45
         for paragraph in text_content.split("\n"):
             words = paragraph.split()
             if not words:
                 wrapped.append("")
                 continue
             line = ""
-            max_width = w - margin_x - 45
             for word in words:
                 test = (line + " " + word).strip()
-                if c.stringWidth(test, font_name, font_size) < max_width:
+                if c.stringWidth(test, font_name, font_size) < max_w:
                     line = test
                 else:
                     wrapped.append(line)
@@ -677,39 +722,56 @@ def create_handwritten_pdf(text: str, font_key: str, notebook_style: str = "clas
             wrapped.append(line)
         return wrapped
 
-    # ── Draw text with CORRECT baseline alignment ─────────────────
-    # FIX: text baseline should sit exactly ON the ruled line.
-    # ReportLab's drawString(x, y, text) places the BASELINE at y.
-    # So we draw text at same y as the ruled lines → text sits ON lines.
-
+    # ── Render pages ──────────────────────────────────────────────────────
     draw_page_lines(c)
     c.setFont(font_name, font_size)
-
-    tc = style["text_color"]
     c.setFillColorRGB(*tc)
 
-    lines = wrap_text(text)
-
-    # First line position — ALIGNED with the first ruled line
-    top_y = h - 72  # Must match draw_page_lines top_y
-    y_pos = top_y   # Baseline ON the first ruled line ← KEY FIX
-
-    text_x = margin_x + 6  # Start writing just after margin line
+    lines   = wrap_text(text)
+    y_pos   = TOP_LINE_Y
+    text_x  = margin_x + 6
 
     for line in lines:
         if y_pos < 45:
+            draw_credit(c)
             c.showPage()
             draw_page_lines(c)
             c.setFont(font_name, font_size)
             c.setFillColorRGB(*tc)
-            y_pos = top_y
+            y_pos = TOP_LINE_Y
 
         if line:
             c.drawString(text_x, y_pos, line)
-        y_pos -= line_spacing  # Move to next ruled line
+        y_pos -= line_spacing
 
+    draw_credit(c)
     c.save()
     return buf.getvalue()
+
+
+def create_handwritten_jpg(
+    text: str,
+    font_key: str,
+    notebook_style: str = "classic_blue",
+    title: str = "",
+    credit: str = "Written By - Technical Serena",
+) -> list:
+    """
+    Same as create_handwritten_pdf but returns list of JPG images (one per page).
+    Each item is raw JPEG bytes.
+    """
+    pdf_bytes = create_handwritten_pdf(text, font_key, notebook_style, title, credit)
+    images    = []
+    with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
+        for page in doc:
+            mat = fitz.Matrix(2.0, 2.0)   # 2× for crisp JPG
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=95, optimize=True)
+            images.append(buf.getvalue())
+    return images
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -204,6 +204,16 @@ def language_menu():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CONFIRM PAYMENT MENU  ← FIX: was missing, caused ImportError
+# ─────────────────────────────────────────────────────────────────────────────
+def confirm_payment_menu(plan: str = "basic"):
+    return M([
+        [B("📸 Send Payment Screenshot", callback_data=f"pay_ss_{plan}")],
+        [B("🏠 Main Menu",               callback_data="back_main")],
+    ])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PREMIUM MENU
 # ─────────────────────────────────────────────────────────────────────────────
 def premium_menu():
