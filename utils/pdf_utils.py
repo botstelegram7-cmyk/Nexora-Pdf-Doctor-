@@ -820,3 +820,143 @@ def _to_roman(n: int) -> str:
 def file_size_str(data: bytes) -> str:
     kb = len(data) / 1024
     return f"{kb/1024:.2f} MB" if kb > 1024 else f"{kb:.1f} KB"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REVERSE PAGES  ✨ NEW v4
+# ─────────────────────────────────────────────────────────────────────────────
+def reverse_pages(data: bytes) -> bytes:
+    """Reverse the order of all pages."""
+    with fitz.open(stream=data, filetype="pdf") as doc:
+        total = len(doc)
+        out = fitz.open()
+        for i in range(total - 1, -1, -1):
+            out.insert_pdf(doc, from_page=i, to_page=i)
+        buf = io.BytesIO()
+        out.save(buf)
+        return buf.getvalue()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PDF COMPARE  ✨ NEW v4
+# Returns a PDF with highlighted differences + summary dict
+# ─────────────────────────────────────────────────────────────────────────────
+def compare_pdfs(data1: bytes, data2: bytes) -> tuple[bytes, dict]:
+    """
+    Compare two PDFs page by page.
+    Returns: (comparison_pdf_bytes, summary_dict)
+    Highlights: green = added lines, red = removed lines.
+    """
+    from reportlab.pdfgen import canvas as rl_canvas
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+
+    # Extract text from both
+    def extract_text_lines(data):
+        lines = []
+        with fitz.open(stream=data, filetype="pdf") as doc:
+            for page in doc:
+                page_lines = page.get_text().split("\n")
+                lines.extend(page_lines)
+        return lines
+
+    lines1 = extract_text_lines(data1)
+    lines2 = extract_text_lines(data2)
+
+    import difflib
+    diff = list(difflib.unified_diff(lines1, lines2, lineterm="", n=0))
+
+    added   = sum(1 for l in diff if l.startswith("+") and not l.startswith("+++"))
+    removed = sum(1 for l in diff if l.startswith("-") and not l.startswith("---"))
+    diff_lines = added + removed
+
+    # Count pages
+    with fitz.open(stream=data1, filetype="pdf") as d1:
+        pages1 = len(d1)
+    with fitz.open(stream=data2, filetype="pdf") as d2:
+        pages2 = len(d2)
+
+    # Build comparison PDF using reportlab
+    buf = io.BytesIO()
+    c = rl_canvas.Canvas(buf, pagesize=A4)
+    w, h = A4
+
+    c.setFont("Helvetica-Bold", 16)
+    c.setFillColor(colors.HexColor("#1a1a2e"))
+    c.rect(0, h - 60, w, 60, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.drawString(20, h - 40, "📄 PDF Comparison Report")
+
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(20, h - 80, "Summary")
+
+    c.setFont("Helvetica", 10)
+    y = h - 100
+    summary_items = [
+        f"Pages in PDF 1: {pages1}",
+        f"Pages in PDF 2: {pages2}",
+        f"Lines added (+): {added}",
+        f"Lines removed (-): {removed}",
+        f"Total changed lines: {diff_lines}",
+    ]
+    for item in summary_items:
+        c.drawString(30, y, item)
+        y -= 16
+
+    # Draw diff lines
+    c.setFont("Helvetica-Bold", 11)
+    y -= 10
+    c.drawString(20, y, "Differences:")
+    y -= 20
+
+    c.setFont("Courier", 8)
+    shown = 0
+    for line in diff:
+        if y < 40:
+            c.showPage()
+            y = h - 40
+            c.setFont("Courier", 8)
+
+        if line.startswith("+") and not line.startswith("+++"):
+            c.setFillColor(colors.HexColor("#1a6b1a"))
+            c.setStrokeColor(colors.HexColor("#ccffcc"))
+            c.rect(15, y - 3, w - 30, 12, fill=1, stroke=0)
+            c.setFillColor(colors.white)
+        elif line.startswith("-") and not line.startswith("---"):
+            c.setFillColor(colors.HexColor("#6b1a1a"))
+            c.setStrokeColor(colors.HexColor("#ffcccc"))
+            c.rect(15, y - 3, w - 30, 12, fill=1, stroke=0)
+            c.setFillColor(colors.white)
+        elif line.startswith("@@"):
+            c.setFillColor(colors.HexColor("#1a1a6b"))
+            c.setStrokeColor(colors.HexColor("#ccccff"))
+            c.rect(15, y - 3, w - 30, 12, fill=1, stroke=0)
+            c.setFillColor(colors.white)
+        else:
+            c.setFillColor(colors.black)
+
+        # Truncate long lines
+        display = line[:110] if len(line) > 110 else line
+        try:
+            c.drawString(20, y, display)
+        except Exception:
+            c.drawString(20, y, line[:80].encode("ascii", "replace").decode())
+
+        y -= 13
+        shown += 1
+        if shown > 500:
+            c.setFillColor(colors.gray)
+            c.drawString(20, y, f"... and {diff_lines - shown} more differences (truncated)")
+            break
+
+    c.save()
+
+    summary = {
+        "pages1": pages1,
+        "pages2": pages2,
+        "added":  added,
+        "removed": removed,
+        "diff_lines": diff_lines,
+    }
+    return buf.getvalue(), summary
