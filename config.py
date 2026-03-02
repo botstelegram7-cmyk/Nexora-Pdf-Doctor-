@@ -130,3 +130,8 @@ DELETE_BUTTONS_AFTER_SEC = 180   # Delete inline buttons after 3 minutes
 # ─── Bot Info ────────────────────────────────────
 BOT_VERSION = "4.0.0"
 GITHUB      = "@SerenaXdev"
+
+# ─── Handwriting Branding ──────────────────────────────────────────────────
+# Shown at bottom-right of every handwritten page.
+# Change to your name, or set to None to hide completely.
+HANDWRITING_CREDIT = "Written By - Technical Serena"
