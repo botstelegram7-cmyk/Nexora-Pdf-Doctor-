@@ -29,3 +29,6 @@ qrcode[pil]==7.4.2
 # Database
 motor==3.4.0
 pymongo==4.8.0
+
+# v4 additions
+difflib  # built-in, no install needed
