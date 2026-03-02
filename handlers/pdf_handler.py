@@ -45,17 +45,24 @@ def _esc(text: str) -> str:
     return html.escape(str(text))
 
 # ── Multi-Reaction ─────────────────────────────────────────────────────────────
-async def _react(update, count: int = None):
-    """Send multiple random reactions at once."""
+async def _react(update, count: int = None):  # FIXED v4.1
+    """
+    FIXED: Telegram bots can only set 1 reaction per message.
+    Using only valid Bot API approved reaction emoji.
+    """
+    if not update.message:
+        return
+    # Only these emoji work as bot reactions in Telegram Bot API 7.0+
+    VALID = [
+        "👍","👎","❤","🔥","🥰","👏","😁","🤔","🤯","😱",
+        "🎉","🤩","🙏","👌","🏆","⚡","💯","🌟","🎊","🥺",
+    ]
     try:
         from telegram import ReactionTypeEmoji
-        n = count or REACTION_COUNT
-        picked = random.sample(REACTIONS, min(n, len(REACTIONS)))
-        await update.message.set_reaction(
-            [ReactionTypeEmoji(e) for e in picked]
-        )
+        emoji = random.choice(VALID)
+        await update.message.set_reaction([ReactionTypeEmoji(emoji)])
     except Exception:
-        pass
+        pass  # Always silent — reactions are decorative only
 
 # ── Send helpers with auto-button-delete and memory purge ─────────────────────
 async def _send_pdf(update, data: bytes, filename: str, caption: str = ""):
@@ -216,6 +223,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "menu_reverse":       (_prompt, "reverse",       "🔃 Reverse Pages",      "Send the PDF!"),
         "menu_compare":       (_prompt_compare, None, None, None),
         "menu_account":       (_menu_account, None, None, None),
+        "menu_dashboard":     (_menu_dashboard, None, None, None),
         "menu_premium":       (_menu_premium, None, None, None),
         "menu_help":          (_menu_help, None, None, None),
         "menu_lang":          (_menu_lang, None, None, None),
@@ -291,6 +299,12 @@ async def _menu_lang(update, ctx):
     await update.callback_query.message.reply_text("🌍 <b>Choose Language:</b>", parse_mode="HTML", reply_markup=language_menu())
 async def _menu_account(update, ctx):
     from handlers.start_handler import account_cmd; await account_cmd(update, ctx)
+async def _menu_dashboard(update, ctx):
+    # Simulate a real update for dashboard
+    class _FakeUpdate:
+        effective_user = update.callback_query.from_user
+        message = update.callback_query.message
+    await cmd_dashboard(_FakeUpdate(), None)
 async def _menu_premium(update, ctx):
     from handlers.premium_handler import premium_cmd; await premium_cmd(update, ctx)
 async def _menu_help(update, ctx):
@@ -1160,20 +1174,24 @@ async def cmd_dashboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ─────────────────────────────────────────────────────────────────────────────
 async def handle_group_reaction(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """
-    React with multiple emojis to messages in groups/channels.
-    Only fires if GROUP_REACTIONS_ENABLED = True.
-    Uses REACTION_CHANCE to avoid spamming every single message.
+    React to ALL group messages (PDF, video, sticker, text, emoji — everything).
+    FIXED: Uses only 1 valid reaction emoji (bot API limitation).
+    Configurable chance to avoid spam.
     """
-    from config import GROUP_REACTIONS_ENABLED, GROUP_REACTION_CHANCE, REACTION_COUNT
+    from config import GROUP_REACTIONS_ENABLED, GROUP_REACTION_CHANCE
     if not GROUP_REACTIONS_ENABLED:
         return
-    # Roll the dice — don't react to every single message
+    if not update.message:
+        return
     if random.random() > GROUP_REACTION_CHANCE:
         return
+    VALID = [
+        "👍","❤","🔥","🥰","👏","😁","🤯","😱","🎉","🤩",
+        "🙏","👌","🏆","⚡","💯","🌟","🎊","🥺","😍","🤣",
+    ]
     try:
         from telegram import ReactionTypeEmoji
-        picked = random.sample(REACTIONS, min(REACTION_COUNT, len(REACTIONS)))
-        await update.message.set_reaction([ReactionTypeEmoji(e) for e in picked])
+        await update.message.set_reaction([ReactionTypeEmoji(random.choice(VALID))])
     except Exception:
         pass
 
