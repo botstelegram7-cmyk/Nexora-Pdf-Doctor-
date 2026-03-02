@@ -23,7 +23,7 @@ from database import check_feature_limit, increment_usage, get_user_dashboard, g
 S = {
     "compress","split","merge","lock","lock_pass","unlock","unlock_pass",
     "watermark","wm_text","wm_logo_img","dark","pageno","excel","repair",
-    "pdf2img","img2pdf","bg","hw_font_sel","hw_style_sel","hw_text","ocr",
+    "pdf2img","img2pdf","bg","hw_font_sel","hw_style_sel","hw_title","hw_text","ocr",
     "rotate","resize","addtext","addtext_input","footer","footer_input",
     "extract","extract_range","meta",
     "pdf2word","pdf2ppt","crop","qr",
@@ -323,9 +323,10 @@ async def _nbstyle_selected(update, ctx, style_key):
     from config import NOTEBOOK_STYLES
     name = NOTEBOOK_STYLES.get(style_key, {}).get("name", "?")
     ctx.user_data["hw_style"] = style_key
-    _set_state(ctx, "hw_text", hw_font=ctx.user_data.get("hw_font", "caveat"), hw_style=style_key)
+    _set_state(ctx, "hw_title", hw_font=ctx.user_data.get("hw_font", "caveat"), hw_style=style_key)
     await update.callback_query.message.reply_text(
-        f"✅ Style: <b>{name}</b>\n\n✍️ Now <b>type your text</b>:",
+        f"✅ Style: <b>{name}</b>\n\n📌 Now enter a <b>Title</b> for your page:\n"
+        "(Ye page ke top par dikhega — skip karne ke liye - type karo)",
         parse_mode="HTML", reply_markup=cancel_btn()
     )
 
@@ -373,7 +374,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "watermark": _do_watermark, "wm_text": _do_wm_text, "wm_logo_img": _do_wm_logo,
         "dark": _do_dark, "pageno": _do_pageno, "excel": _do_excel,
         "repair": _do_repair, "pdf2img": _do_pdf2img, "img2pdf": _do_img2pdf_collect,
-        "bg": _do_bg, "hw_text": _do_handwrite, "ocr": _do_ocr,
+        "bg": _do_bg, "hw_title": _do_hw_title, "hw_text": _do_handwrite, "ocr": _do_ocr,
         "rotate": _do_rotate_collect, "resize": _do_resize,
         "addtext": _do_addtext_pdf, "addtext_input": _do_addtext_input,
         "footer": _do_footer_pdf, "footer_input": _do_footer_input,
@@ -711,29 +712,68 @@ async def _do_bg(update, ctx):
     except Exception as e:
         await pg.fail(str(e)); await _err(update, str(e))
 
+async def _do_hw_title(update, ctx):
+    """User sends title (or '-' to skip)."""
+    if not update.message.text:
+        await update.message.reply_text("⚠️ Please type a title (or - to skip)!", reply_markup=cancel_btn())
+        return
+    raw = update.message.text.strip()
+    ctx.user_data["hw_title"] = "" if raw == "-" else raw
+    _set_state(ctx, "hw_text",
+               hw_font=ctx.user_data.get("hw_font", "caveat"),
+               hw_style=ctx.user_data.get("hw_style", "classic_blue"))
+    await update.message.reply_text(
+        f"✅ Title: <b>{ctx.user_data['hw_title'] or '(none)'}</b>\n\n✍️ Now <b>type your text</b>:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
 async def _do_handwrite(update, ctx):
     if not await _check_limit(update, ctx, "handwrite"): return
     if not update.message.text:
         await update.message.reply_text("⚠️ Please type your text!", reply_markup=cancel_btn()); return
-    text      = update.message.text.strip()
-    font_key  = ctx.user_data.get("hw_font", "caveat")
-    style_key = ctx.user_data.get("hw_style", "classic_blue")
-    from config import FONTS, NOTEBOOK_STYLES
-    font_name  = FONTS.get(font_key, {}).get("name", "Default")
+    text       = update.message.text.strip()
+    font_key   = ctx.user_data.get("hw_font",  "caveat")
+    style_key  = ctx.user_data.get("hw_style", "classic_blue")
+    hw_title   = ctx.user_data.get("hw_title", "")
+    from config import FONTS, NOTEBOOK_STYLES, HANDWRITING_CREDIT
+    font_name  = FONTS.get(font_key,  {}).get("name", "Default")
     style_name = NOTEBOOK_STYLES.get(style_key, {}).get("name", "Classic")
+    credit     = HANDWRITING_CREDIT  # from config — user can change/set None
+
     pg = await make_progress(update, "Creating Handwritten PDF")
     try:
         await pg.update(40, f"Writing with {font_name}...")
-        result = pdf_utils.create_handwritten_pdf(text, font_key, style_key)
+        result = pdf_utils.create_handwritten_pdf(text, font_key, style_key,
+                                                   title=hw_title, credit=credit or "")
+        await pg.update(75, "Generating JPG images...")
+        jpg_pages = pdf_utils.create_handwritten_jpg(text, font_key, style_key,
+                                                      title=hw_title, credit=credit or "")
         await pg.update(90, "Saving...")
         _clear(ctx)
         await pg.delete()
         await increment_usage(update.effective_user.id, "handwrite")
-        await _send_pdf(update, result, "handwritten.pdf",
-                        f"✍️ <b>Handwritten PDF!</b>\n📝 Font: {font_name}\n📓 Style: {style_name}")
-        del result; gc.collect()
+
+        # ── Send PDF ───────────────────────────────────────────────────────
+        caption = (
+            f"✍️ <b>Handwritten PDF!</b>\n"
+            f"📝 Font: {font_name}\n"
+            f"📓 Style: {style_name}"
+            + (f"\n📌 Title: {hw_title}" if hw_title else "")
+        )
+        await _send_pdf(update, result, "handwritten.pdf", caption)
+
+        # ── Send JPG pages ─────────────────────────────────────────────────
+        for i, jpg in enumerate(jpg_pages[:20], 1):   # cap at 20 pages
+            await update.effective_message.reply_photo(
+                photo=io.BytesIO(jpg),
+                caption=f"🖼️ Page {i}/{len(jpg_pages)}" if len(jpg_pages) > 1 else "🖼️ Handwritten JPG",
+                parse_mode="HTML",
+            )
+        del result, jpg_pages; gc.collect()
     except Exception as e:
         await pg.fail(str(e)); await _err(update, str(e))
+
+
 
 async def _do_ocr(update, ctx):
     """
