@@ -1,6 +1,6 @@
 """
-Database v4 — SQLite (default) or MongoDB.
-New: per-feature usage tracking, monthly stats, referrals, dashboard.
+Database v5 — SQLite (default) or MongoDB.
+New: notes, file history, reminders, bulk sessions.
 """
 import sqlite3, os, datetime
 from config import MONGODB_URL
@@ -68,6 +68,30 @@ def init_sqlite():
             referred_id  INTEGER,
             created_at   TEXT,
             PRIMARY KEY (referred_id)
+        );
+        CREATE TABLE IF NOT EXISTS user_notes (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER,
+            title       TEXT,
+            content     TEXT,
+            created_at  TEXT
+        );
+        CREATE TABLE IF NOT EXISTS file_history (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER,
+            feature     TEXT,
+            filename    TEXT,
+            file_id     TEXT,
+            size_str    TEXT,
+            created_at  TEXT
+        );
+        CREATE TABLE IF NOT EXISTS reminders (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER,
+            chat_id     INTEGER,
+            message     TEXT,
+            fire_at     TEXT,
+            done        INTEGER DEFAULT 0
         );
         """)
 
@@ -160,7 +184,6 @@ async def get_all_users() -> list:
 # ── Usage Tracking ─────────────────────────────────────────────────────────────
 
 async def get_usage(user_id: int) -> int:
-    """Total daily usage."""
     today = _today()
     if _mongo_db:
         doc = await _mongo_db.daily_usage.find_one({"user_id": user_id, "date": today})
@@ -171,7 +194,6 @@ async def get_usage(user_id: int) -> int:
         return row["count"] if row else 0
 
 async def get_feature_usage(user_id: int, feature: str) -> int:
-    """Per-feature daily usage."""
     today = _today()
     if _mongo_db:
         doc = await _mongo_db.feature_usage.find_one({"user_id": user_id, "date": today, "feature": feature})
@@ -184,7 +206,6 @@ async def get_feature_usage(user_id: int, feature: str) -> int:
         return row["count"] if row else 0
 
 async def increment_usage(user_id: int, feature: str = "general"):
-    """Increment both total and per-feature usage."""
     today = _today()
     month = _this_month()
     if _mongo_db:
@@ -212,17 +233,13 @@ async def increment_usage(user_id: int, feature: str = "general"):
             conn.execute("UPDATE users SET total_ops=total_ops+1 WHERE user_id=?", (user_id,))
 
 async def check_feature_limit(user_id: int, feature: str) -> tuple[bool, str]:
-    """
-    Returns (allowed: bool, reason: str).
-    Checks per-feature limit for user's plan.
-    """
     from config import FEATURE_LIMITS
     plan   = await get_plan(user_id)
     limits = FEATURE_LIMITS.get(feature, {"free": 3, "basic": 30, "pro": None})
     limit  = limits.get(plan)
 
     if limit is None:
-        return True, ""   # Unlimited
+        return True, ""
 
     if limit == 0:
         plan_needed = "Pro" if limits.get("pro") is None else "Basic"
@@ -234,10 +251,7 @@ async def check_feature_limit(user_id: int, feature: str) -> tuple[bool, str]:
             f"⚠️ <b>Daily limit reached for {feature.title()}!</b>\n\n"
             f"📊 Used: <b>{used}/{limit}</b> today\n"
             f"🔄 Resets at midnight\n\n"
-            f"💎 Upgrade to get more:\n"
-            f"  ⭐ Basic: {FEATURE_LIMITS.get(feature, {}).get('basic', '?')} ops/day\n"
-            f"  👑 Pro: Unlimited\n\n"
-            f"Use /premium to upgrade!"
+            f"💎 Upgrade to get more — use /premium"
         )
     return True, ""
 
@@ -245,27 +259,20 @@ async def check_feature_limit(user_id: int, feature: str) -> tuple[bool, str]:
 # ── Dashboard Stats ────────────────────────────────────────────────────────────
 
 async def get_user_dashboard(user_id: int) -> dict:
-    """Get stats for /dashboard command."""
     today = _today()
     month = _this_month()
 
     if _mongo_db:
-        # Today's usage by feature
         today_features = {}
         async for doc in _mongo_db.feature_usage.find({"user_id": user_id, "date": today}):
             today_features[doc["feature"]] = doc["count"]
-
-        # This month's usage
         month_total = 0
         async for doc in _mongo_db.daily_usage.find(
             {"user_id": user_id, "date": {"$gte": month + "-01"}}
         ):
             month_total += doc.get("count", 0)
-
         user = await get_user(user_id) or {}
         total_ops = user.get("total_ops", 0)
-
-        # Referral count
         ref_count = await _mongo_db.referrals.count_documents({"referrer_id": user_id})
     else:
         with _get_conn() as conn:
@@ -274,16 +281,13 @@ async def get_user_dashboard(user_id: int) -> dict:
                 (user_id, today)
             ).fetchall()
             today_features = {r["feature"]: r["count"] for r in rows}
-
             month_row = conn.execute(
                 "SELECT SUM(count) as total FROM daily_usage WHERE user_id=? AND date LIKE ?",
                 (user_id, month + "%")
             ).fetchone()
             month_total = month_row["total"] or 0
-
             user = await get_user(user_id) or {}
             total_ops = user.get("total_ops", 0)
-
             ref_row = conn.execute(
                 "SELECT COUNT(*) as cnt FROM referrals WHERE referrer_id=?", (user_id,)
             ).fetchone()
@@ -298,7 +302,6 @@ async def get_user_dashboard(user_id: int) -> dict:
 
 
 async def get_admin_stats() -> dict:
-    """Full stats for admin panel."""
     today = _today()
     month = _this_month()
 
@@ -312,7 +315,6 @@ async def get_admin_stats() -> dict:
             [{"$match": {"date": today}}, {"$group": {"_id": None, "total": {"$sum": "$count"}}}]
         ).to_list(None)
         today_ops = today_ops_doc[0]["total"] if today_ops_doc else 0
-
         month_stats_docs = await _mongo_db.monthly_stats.find({"month": month}).to_list(None)
         month_stats = {d["feature"]: d["count"] for d in month_stats_docs}
         pending_payments = await _mongo_db.payment_requests.count_documents({"status": "pending"})
@@ -324,10 +326,8 @@ async def get_admin_stats() -> dict:
             pro_users    = conn.execute("SELECT COUNT(*) as c FROM users WHERE plan='pro'").fetchone()["c"]
             today_active = conn.execute("SELECT COUNT(DISTINCT user_id) as c FROM daily_usage WHERE date=?", (today,)).fetchone()["c"]
             today_ops    = conn.execute("SELECT SUM(count) as s FROM daily_usage WHERE date=?", (today,)).fetchone()["s"] or 0
-
             rows = conn.execute("SELECT feature, count FROM monthly_stats WHERE month=?", (month,)).fetchall()
             month_stats = {r["feature"]: r["count"] for r in rows}
-
             pending_payments = conn.execute(
                 "SELECT COUNT(*) as c FROM payment_requests WHERE status='pending'"
             ).fetchone()["c"]
@@ -358,3 +358,109 @@ async def save_payment_request(user_id: int, plan: str, file_id: str):
                 "INSERT INTO payment_requests(user_id,plan,screenshot_file_id,status,created_at) VALUES(?,?,?,?,?)",
                 (user_id, plan, file_id, "pending", _now())
             )
+
+
+# ── Notes System ──────────────────────────────────────────────────────────────
+
+async def save_note(user_id: int, title: str, content: str):
+    if _mongo_db:
+        await _mongo_db.user_notes.insert_one(
+            {"user_id": user_id, "title": title, "content": content, "created_at": _now()}
+        )
+    else:
+        with _get_conn() as conn:
+            conn.execute(
+                "INSERT INTO user_notes(user_id,title,content,created_at) VALUES(?,?,?,?)",
+                (user_id, title, content, _now())
+            )
+
+async def get_notes(user_id: int) -> list:
+    if _mongo_db:
+        return await _mongo_db.user_notes.find({"user_id": user_id}).sort("created_at", -1).to_list(20)
+    with _get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM user_notes WHERE user_id=? ORDER BY created_at DESC LIMIT 20", (user_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+async def delete_note(user_id: int, note_id: int):
+    if _mongo_db:
+        await _mongo_db.user_notes.delete_one({"user_id": user_id})
+    else:
+        with _get_conn() as conn:
+            conn.execute("DELETE FROM user_notes WHERE id=? AND user_id=?", (note_id, user_id))
+
+
+# ── File History ──────────────────────────────────────────────────────────────
+
+async def save_file_history(user_id: int, feature: str, filename: str, file_id: str, size_str: str):
+    if _mongo_db:
+        await _mongo_db.file_history.insert_one(
+            {"user_id": user_id, "feature": feature, "filename": filename,
+             "file_id": file_id, "size_str": size_str, "created_at": _now()}
+        )
+        docs = await _mongo_db.file_history.find(
+            {"user_id": user_id}, sort=[("created_at", -1)]
+        ).to_list(None)
+        if len(docs) > 10:
+            old_ids = [d["_id"] for d in docs[10:]]
+            await _mongo_db.file_history.delete_many({"_id": {"$in": old_ids}})
+    else:
+        with _get_conn() as conn:
+            conn.execute(
+                "INSERT INTO file_history(user_id,feature,filename,file_id,size_str,created_at) VALUES(?,?,?,?,?,?)",
+                (user_id, feature, filename, file_id, size_str, _now())
+            )
+            conn.execute("""
+                DELETE FROM file_history WHERE user_id=? AND id NOT IN (
+                    SELECT id FROM file_history WHERE user_id=? ORDER BY created_at DESC LIMIT 10
+                )
+            """, (user_id, user_id))
+
+async def get_file_history(user_id: int) -> list:
+    if _mongo_db:
+        return await _mongo_db.file_history.find(
+            {"user_id": user_id}, sort=[("created_at", -1)]
+        ).to_list(10)
+    with _get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM file_history WHERE user_id=? ORDER BY created_at DESC LIMIT 10", (user_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# ── Reminders ─────────────────────────────────────────────────────────────────
+
+async def save_reminder(user_id: int, chat_id: int, message: str, fire_at: datetime.datetime):
+    if _mongo_db:
+        await _mongo_db.reminders.insert_one({
+            "user_id": user_id, "chat_id": chat_id,
+            "message": message, "fire_at": fire_at.isoformat(), "done": False
+        })
+    else:
+        with _get_conn() as conn:
+            conn.execute(
+                "INSERT INTO reminders(user_id,chat_id,message,fire_at,done) VALUES(?,?,?,?,0)",
+                (user_id, chat_id, message, fire_at.isoformat())
+            )
+
+async def get_due_reminders() -> list:
+    now = datetime.datetime.now().isoformat()
+    if _mongo_db:
+        return await _mongo_db.reminders.find(
+            {"fire_at": {"$lte": now}, "done": False}
+        ).to_list(None)
+    with _get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM reminders WHERE fire_at <= ? AND done=0", (now,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+async def mark_reminder_done(reminder_id: int):
+    if _mongo_db:
+        await _mongo_db.reminders.update_one(
+            {"_id": reminder_id}, {"$set": {"done": True}}
+        )
+    else:
+        with _get_conn() as conn:
+            conn.execute("UPDATE reminders SET done=1 WHERE id=?", (reminder_id,))

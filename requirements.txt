@@ -1,36 +1,54 @@
-# ── Core ──────────────────────────────────────────────────────────────────────
-python-telegram-bot[webhooks]==21.3
+# Core Telegram
+python-telegram-bot[all]==21.6
+
+# Web server
 aiohttp==3.9.5
-python-dotenv==1.0.1
 
-# ── PDF Processing ────────────────────────────────────────────────────────────
-PyMuPDF==1.24.5
-pikepdf==9.0.0
+# PDF processing
+PyMuPDF==1.24.9
+pikepdf==9.2.1
+pdfplumber==0.11.4
 reportlab==4.2.2
-img2pdf==0.5.1
-pdfplumber==0.11.2
-
-# ── OCR ───────────────────────────────────────────────────────────────────────
-pytesseract==0.3.13
-Pillow==10.3.0
-
-# ── Office Formats ────────────────────────────────────────────────────────────
-openpyxl==3.1.5
 python-docx==1.1.2
-python-pptx==0.6.23
 
-# ── QR Code ───────────────────────────────────────────────────────────────────
+# PowerPoint
+python-pptx==1.0.2
+
+# Image processing
+Pillow==10.4.0
+
+# OCR
+pytesseract==0.3.13
+
+# Excel
+openpyxl==3.1.5
+
+# QR Code
 qrcode[pil]==7.4.2
 
-# ── Database (optional MongoDB) ───────────────────────────────────────────────
-motor==3.5.0
-pymongo==4.9.2
+# Barcode
+python-barcode==0.15.1
 
-# ── NOTE: These are Python built-ins — DO NOT add them here ──────────────────
-# difflib  ← built-in
-# html     ← built-in
-# ssl      ← built-in
-# urllib   ← built-in
-# gc       ← built-in
-# io       ← built-in
-# os       ← built-in
+# Background removal (local AI, no API key)
+rembg==2.0.57
+onnxruntime==1.19.2
+
+# EPUB support
+EbookLib==0.18
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# HTML to PDF
+weasyprint==62.3
+
+# QR code scanning
+pyzbar==0.1.1
+
+# Environment variables
+python-dotenv==1.0.1
+
+# MongoDB (optional)
+motor==3.5.1
+
+# Numpy (for deskew)
+numpy==1.26.4
