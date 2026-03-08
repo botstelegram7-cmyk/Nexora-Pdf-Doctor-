@@ -1698,3 +1698,716 @@ def create_handwritten_pdf(text, font_key, notebook_style="classic_blue", title=
     draw_credit(c)
     c.save()
     return buf.getvalue()
+
+
+# =============================================================================
+# v6 NEW FUNCTIONS — PDF Tools
+# =============================================================================
+
+def pdf_stamp(data: bytes, stamp_text: str, color: tuple = (180, 0, 0)) -> bytes:
+    """Add diagonal stamp (CONFIDENTIAL / DRAFT / APPROVED etc.) to all pages."""
+    import fitz, math
+    doc = fitz.open(stream=data, filetype="pdf")
+    r, g, b = color[0]/255, color[1]/255, color[2]/255
+    for page in doc:
+        pw, ph = page.rect.width, page.rect.height
+        angle  = -math.degrees(math.atan2(ph, pw))
+        cx, cy = pw / 2, ph / 2
+        fs     = min(pw, ph) / 6
+        # semi-transparent diagonal text
+        page.insert_text(
+            fitz.Point(cx - fs * 1.5, cy + fs * 0.4),
+            stamp_text.replace("⛔ ", "").replace("📝 ", "").replace("✅ ", "")
+              .replace("❌ ", "").replace("🔒 ", "").replace("📋 ", "")
+              .replace("💰 ", "").replace("⏳ ", ""),
+            fontsize=fs,
+            rotate=int(-angle),
+            color=(r, g, b),
+            fill_opacity=0.18,
+            overlay=True,
+        )
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def pdf_grayscale(data: bytes) -> bytes:
+    """Convert all pages to grayscale."""
+    import fitz
+    doc = fitz.open(stream=data, filetype="pdf")
+    buf = io.BytesIO()
+    # Render each page as grayscale image, rebuild PDF
+    new_doc = fitz.open()
+    for page in doc:
+        pix     = page.get_pixmap(colorspace=fitz.csGRAY, dpi=150)
+        img_pdf = fitz.open("pdf", pix.pdfocr_data())
+        new_doc.insert_pdf(img_pdf)
+    new_doc.save(buf)
+    return buf.getvalue()
+
+
+def pdf_extract_images(data: bytes) -> bytes:
+    """Extract all images from PDF, return as ZIP."""
+    import fitz
+    doc    = fitz.open(stream=data, filetype="pdf")
+    files  = []
+    count  = 0
+    for page_num, page in enumerate(doc):
+        for img in page.get_images(full=True):
+            xref   = img[0]
+            base   = doc.extract_image(xref)
+            ext    = base["ext"]
+            imgbytes = base["image"]
+            files.append((f"page{page_num+1}_img{count+1}.{ext}", imgbytes))
+            count += 1
+            if count >= 50:
+                break
+        if count >= 50:
+            break
+    if not files:
+        raise ValueError("No images found in this PDF!")
+    return create_zip(files)
+
+
+def pdf_remove_metadata(data: bytes) -> bytes:
+    """Strip all metadata from PDF for privacy."""
+    import pikepdf
+    pdf = pikepdf.open(io.BytesIO(data))
+    with pdf.open_metadata() as meta:
+        keys = list(meta.keys())
+        for k in keys:
+            try:
+                del meta[k]
+            except Exception:
+                pass
+    pdf.docinfo.clear()
+    buf = io.BytesIO()
+    pdf.save(buf)
+    return buf.getvalue()
+
+
+def pdf_word_count(data: bytes) -> dict:
+    """Count pages, words, characters, lines in PDF."""
+    import fitz
+    doc   = fitz.open(stream=data, filetype="pdf")
+    total_words = total_chars = total_lines = 0
+    for page in doc:
+        text         = page.get_text()
+        words        = text.split()
+        total_words += len(words)
+        total_chars += len(text.replace("\n", ""))
+        total_lines += text.count("\n")
+    return {
+        "pages":  len(doc),
+        "words":  total_words,
+        "chars":  total_chars,
+        "lines":  total_lines,
+        "avg_words_per_page": round(total_words / max(len(doc), 1), 1),
+    }
+
+
+def pdf_add_header(data: bytes, header_text: str) -> bytes:
+    """Add a header text to every page of the PDF."""
+    import fitz
+    doc = fitz.open(stream=data, filetype="pdf")
+    for page in doc:
+        pw = page.rect.width
+        page.insert_text(
+            fitz.Point(pw / 2 - len(header_text) * 3.5, page.rect.height - 20),
+            header_text,
+            fontsize=9,
+            color=(0.3, 0.3, 0.3),
+            overlay=True,
+        )
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def pdf_get_bookmarks(data: bytes) -> list:
+    """Extract table of contents / bookmarks from PDF."""
+    import fitz
+    doc = fitz.open(stream=data, filetype="pdf")
+    toc = doc.get_toc()
+    return [{"level": t[0], "title": t[1], "page": t[2]} for t in toc]
+
+
+# =============================================================================
+# v6 NEW FUNCTIONS — Image Tools
+# =============================================================================
+
+def img_collage(images: list, cols: int = 2) -> bytes:
+    """
+    Create a collage from list of image bytes.
+    images: list of bytes
+    """
+    from PIL import Image as PILImage
+    opened = []
+    for raw in images[:12]:
+        try:
+            opened.append(PILImage.open(io.BytesIO(raw)).convert("RGB"))
+        except Exception:
+            pass
+    if not opened:
+        raise ValueError("No valid images!")
+    thumb_w, thumb_h = 400, 300
+    thumbs   = [i.resize((thumb_w, thumb_h), PILImage.LANCZOS) for i in opened]
+    rows     = math.ceil(len(thumbs) / cols)
+    canvas   = PILImage.new("RGB", (cols * thumb_w, rows * thumb_h), (30, 30, 30))
+    for idx, thumb in enumerate(thumbs):
+        x = (idx % cols) * thumb_w
+        y = (idx // cols) * thumb_h
+        canvas.paste(thumb, (x, y))
+    buf = io.BytesIO()
+    canvas.save(buf, "JPEG", quality=90)
+    return buf.getvalue()
+
+
+def img_meme(data: bytes, top_text: str = "", bottom_text: str = "") -> bytes:
+    """Classic meme generator — bold white text with black stroke."""
+    from PIL import Image as PILImage, ImageDraw, ImageFont
+    img  = PILImage.open(io.BytesIO(data)).convert("RGB")
+    draw = ImageDraw.Draw(img)
+    w, h = img.size
+    fs   = max(30, w // 12)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs)
+    except Exception:
+        font = ImageFont.load_default()
+
+    def draw_text_with_stroke(text, y, anchor="mt"):
+        if not text:
+            return
+        text = text.upper()
+        bbox = draw.textbbox((0, 0), text, font=font)
+        tw   = bbox[2] - bbox[0]
+        x    = (w - tw) // 2
+        # stroke
+        for ox in range(-3, 4):
+            for oy in range(-3, 4):
+                draw.text((x + ox, y + oy), text, font=font, fill=(0, 0, 0))
+        draw.text((x, y), text, font=font, fill=(255, 255, 255))
+
+    draw_text_with_stroke(top_text,    20)
+    draw_text_with_stroke(bottom_text, h - fs - 30)
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=92)
+    return buf.getvalue()
+
+
+def img_make_sticker(data: bytes) -> bytes:
+    """Resize to 512×512 WebP for Telegram sticker."""
+    from PIL import Image as PILImage
+    img  = PILImage.open(io.BytesIO(data)).convert("RGBA")
+    img  = img.resize((512, 512), PILImage.LANCZOS)
+    buf  = io.BytesIO()
+    img.save(buf, "WEBP", quality=90)
+    return buf.getvalue()
+
+
+def img_ascii_art(data: bytes, width: int = 80) -> str:
+    """Convert image to ASCII art string."""
+    from PIL import Image as PILImage
+    chars  = "@%#*+=-:. "
+    img    = PILImage.open(io.BytesIO(data)).convert("L")
+    ratio  = img.height / img.width
+    height = int(width * ratio * 0.45)
+    img    = img.resize((width, height))
+    pixels = list(img.getdata())
+    ascii_img = ""
+    for i, px in enumerate(pixels):
+        ascii_img += chars[int(px / 255 * (len(chars) - 1))]
+        if (i + 1) % width == 0:
+            ascii_img += "\n"
+    return ascii_img
+
+
+def img_flip(data: bytes, direction: str = "horizontal") -> bytes:
+    """Flip image horizontal or vertical."""
+    from PIL import Image as PILImage
+    img = PILImage.open(io.BytesIO(data))
+    if direction == "horizontal":
+        img = img.transpose(PILImage.FLIP_LEFT_RIGHT)
+    else:
+        img = img.transpose(PILImage.FLIP_TOP_BOTTOM)
+    buf = io.BytesIO()
+    img.save(buf, img.format or "PNG")
+    return buf.getvalue()
+
+
+def img_add_border(data: bytes, size: int = 20, color: tuple = (255, 255, 255)) -> bytes:
+    """Add colored border around image."""
+    from PIL import Image as PILImage, ImageOps
+    img    = PILImage.open(io.BytesIO(data)).convert("RGB")
+    result = ImageOps.expand(img, border=size, fill=color)
+    buf    = io.BytesIO()
+    result.save(buf, "JPEG", quality=92)
+    return buf.getvalue()
+
+
+def img_round_corners(data: bytes, radius: int = 40) -> bytes:
+    """Apply rounded corners to image (PNG with transparency)."""
+    from PIL import Image as PILImage, ImageDraw
+    img  = PILImage.open(io.BytesIO(data)).convert("RGBA")
+    mask = PILImage.new("L", img.size, 0)
+    draw = ImageDraw.Draw(mask)
+    draw.rounded_rectangle([(0, 0), img.size], radius=radius, fill=255)
+    img.putalpha(mask)
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
+def img_get_exif(data: bytes) -> dict:
+    """Extract EXIF data from image."""
+    from PIL import Image as PILImage
+    from PIL.ExifTags import TAGS
+    img    = PILImage.open(io.BytesIO(data))
+    result = {}
+    try:
+        exif_data = img._getexif()
+        if exif_data:
+            for tag_id, value in exif_data.items():
+                tag = TAGS.get(tag_id, str(tag_id))
+                if isinstance(value, (str, int, float)):
+                    result[tag] = str(value)[:100]
+    except Exception:
+        pass
+    return result
+
+
+def img_remove_exif(data: bytes) -> bytes:
+    """Strip all EXIF metadata from image (privacy)."""
+    from PIL import Image as PILImage
+    img     = PILImage.open(io.BytesIO(data))
+    clean   = PILImage.new(img.mode, img.size)
+    clean.putdata(list(img.getdata()))
+    buf = io.BytesIO()
+    fmt = img.format or "JPEG"
+    clean.save(buf, fmt)
+    return buf.getvalue()
+
+
+def img_auto_enhance(data: bytes) -> bytes:
+    """Auto-enhance brightness, contrast and sharpness."""
+    from PIL import Image as PILImage, ImageEnhance
+    img = PILImage.open(io.BytesIO(data)).convert("RGB")
+    img = ImageEnhance.Brightness(img).enhance(1.1)
+    img = ImageEnhance.Contrast(img).enhance(1.2)
+    img = ImageEnhance.Sharpness(img).enhance(1.3)
+    img = ImageEnhance.Color(img).enhance(1.1)
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=92)
+    return buf.getvalue()
+
+
+def img_apply_filter_v2(data: bytes, filter_name: str) -> bytes:
+    """Extended filter support with vivid/vintage/cool/warm."""
+    from PIL import Image as PILImage, ImageEnhance, ImageFilter
+    import numpy as np
+    img = PILImage.open(io.BytesIO(data)).convert("RGB")
+
+    if filter_name == "vivid":
+        img = ImageEnhance.Color(img).enhance(2.0)
+        img = ImageEnhance.Contrast(img).enhance(1.3)
+    elif filter_name == "vintage":
+        arr = np.array(img, dtype=np.float32)
+        arr[:, :, 0] = np.clip(arr[:, :, 0] * 1.1 + 20, 0, 255)
+        arr[:, :, 1] = np.clip(arr[:, :, 1] * 0.9, 0, 255)
+        arr[:, :, 2] = np.clip(arr[:, :, 2] * 0.7, 0, 255)
+        img = PILImage.fromarray(arr.astype(np.uint8))
+        img = ImageEnhance.Contrast(img).enhance(0.85)
+    elif filter_name == "cool":
+        arr = np.array(img, dtype=np.float32)
+        arr[:, :, 0] = np.clip(arr[:, :, 0] * 0.85, 0, 255)
+        arr[:, :, 2] = np.clip(arr[:, :, 2] * 1.2 + 15, 0, 255)
+        img = PILImage.fromarray(arr.astype(np.uint8))
+    elif filter_name == "warm":
+        arr = np.array(img, dtype=np.float32)
+        arr[:, :, 0] = np.clip(arr[:, :, 0] * 1.2 + 15, 0, 255)
+        arr[:, :, 2] = np.clip(arr[:, :, 2] * 0.8, 0, 255)
+        img = PILImage.fromarray(arr.astype(np.uint8))
+    else:
+        # fallback to existing
+        return img_apply_filter(data, filter_name)
+
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=92)
+    return buf.getvalue()
+
+
+# =============================================================================
+# v6 NEW FUNCTIONS — Creative / Cards
+# =============================================================================
+
+import math
+
+def create_quote_card(quote: str, author: str = "", theme: str = "dark") -> bytes:
+    """Beautiful quote card image (1080×1080)."""
+    from PIL import Image as PILImage, ImageDraw, ImageFont
+    from config import QUOTE_THEMES
+    t    = QUOTE_THEMES.get(theme, QUOTE_THEMES["dark"])
+    W, H = 1080, 1080
+    img  = PILImage.new("RGB", (W, H), t["bg"])
+    draw = ImageDraw.Draw(img)
+
+    # Accent bars
+    bar_h = 8
+    for i in range(4):
+        alpha = int(255 * (0.8 - i * 0.2))
+        draw.rectangle([60, 80 + i, W - 60, 80 + bar_h + i],
+                       fill=(*t["accent"], alpha) if len(t["accent"]) == 4 else t["accent"])
+    draw.rectangle([60, 80, W - 60, 80 + bar_h], fill=t["accent"])
+    draw.rectangle([60, H - 80 - bar_h, W - 60, H - 80], fill=t["accent"])
+
+    # Quote marks
+    try:
+        font_big = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 120)
+        font_quote = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 42)
+        font_author = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+    except Exception:
+        font_big   = ImageFont.load_default()
+        font_quote = font_big
+        font_author = font_big
+
+    draw.text((80, 110), "\u201c", font=font_big, fill=(*t["accent"],) if isinstance(t["accent"], tuple) else t["accent"])
+
+    # Word wrap quote
+    words   = quote.split()
+    lines   = []
+    line    = ""
+    max_w   = W - 160
+    for word in words:
+        test = (line + " " + word).strip()
+        bbox = draw.textbbox((0, 0), test, font=font_quote)
+        if bbox[2] - bbox[0] > max_w and line:
+            lines.append(line)
+            line = word
+        else:
+            line = test
+    if line:
+        lines.append(line)
+
+    total_h = len(lines) * 60
+    y_start = (H - total_h) // 2 - 30
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font_quote)
+        x    = (W - (bbox[2] - bbox[0])) // 2
+        draw.text((x, y_start), line, font=font_quote, fill=t["text"])
+        y_start += 60
+
+    # Author
+    if author:
+        author_text = f"\u2014 {author}"
+        bbox        = draw.textbbox((0, 0), author_text, font=font_author)
+        x           = (W - (bbox[2] - bbox[0])) // 2
+        draw.text((x, H - 180), author_text, font=font_author,
+                  fill=t["accent"])
+
+    buf = io.BytesIO()
+    img.save(buf, "PNG", quality=95)
+    return buf.getvalue()
+
+
+def create_birthday_card(name: str, message: str = "") -> bytes:
+    """Colorful birthday card PDF."""
+    from reportlab.lib.pagesizes import A5
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas as rl_canvas
+    W, H = A5
+    buf  = io.BytesIO()
+    c    = rl_canvas.Canvas(buf, pagesize=A5)
+
+    # Gradient-like background
+    for i in range(int(H)):
+        ratio = i / H
+        r = int(255 * (1 - ratio * 0.3))
+        g = int(100 + 80 * ratio)
+        b = int(150 + 100 * ratio)
+        c.setFillColorRGB(r/255, g/255, b/255)
+        c.rect(0, i, W, 1, fill=1, stroke=0)
+
+    # Balloons (circles)
+    balloon_data = [
+        (80,  H-80,  30, (1.0, 0.3, 0.3)),
+        (160, H-60,  25, (0.3, 0.8, 0.3)),
+        (W-80, H-80, 30, (0.3, 0.5, 1.0)),
+        (W-150, H-55, 22, (1.0, 0.8, 0.0)),
+        (W//2, H-100, 28, (1.0, 0.4, 0.8)),
+    ]
+    for bx, by, br, bc in balloon_data:
+        c.setFillColorRGB(*bc)
+        c.circle(bx, by, br, fill=1, stroke=0)
+        c.setStrokeColorRGB(0.5, 0.5, 0.5)
+        c.setLineWidth(1)
+        c.line(bx, by - br, bx - 5, by - br - 40)
+
+    # Title
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 36)
+    title = "Happy Birthday!"
+    c.drawCentredString(W/2, H - 160, title)
+
+    # Name
+    c.setFont("Helvetica-Bold", 28)
+    c.setFillColorRGB(1, 0.95, 0.5)
+    c.drawCentredString(W/2, H - 210, name)
+
+    # Message
+    if message:
+        c.setFont("Helvetica", 16)
+        c.setFillColorRGB(1, 1, 1)
+        # wrap
+        words  = message.split()
+        lines  = []
+        line   = ""
+        for word in words:
+            test = (line + " " + word).strip()
+            if c.stringWidth(test, "Helvetica", 16) > W - 80:
+                lines.append(line)
+                line = word
+            else:
+                line = test
+        if line:
+            lines.append(line)
+        y = H - 270
+        for ln in lines:
+            c.drawCentredString(W/2, y, ln)
+            y -= 24
+
+    # Cake emoji text
+    c.setFont("Helvetica", 48)
+    c.drawCentredString(W/2, 140, "🎂🎉🎊")
+
+    c.save()
+    return buf.getvalue()
+
+
+def create_business_card(name: str, title: str, phone: str,
+                         email: str, company: str, theme: str = "minimal") -> bytes:
+    """Professional business card PDF (standard 3.5x2 inch)."""
+    from reportlab.lib.pagesizes import inch
+    from reportlab.pdfgen import canvas as rl_canvas
+    from config import BCARD_THEMES
+    t       = BCARD_THEMES.get(theme, BCARD_THEMES["minimal"])
+    W, H    = 3.5 * inch, 2.0 * inch
+    buf     = io.BytesIO()
+    c       = rl_canvas.Canvas(buf, pagesize=(W, H))
+    bg      = tuple(v/255 for v in t["bg"])
+    accent  = tuple(v/255 for v in t["accent"])
+    text_c  = tuple(v/255 for v in t["text"])
+
+    # Background
+    c.setFillColorRGB(*bg)
+    c.rect(0, 0, W, H, fill=1, stroke=0)
+
+    # Accent bar left
+    c.setFillColorRGB(*accent)
+    c.rect(0, 0, 6, H, fill=1, stroke=0)
+
+    # Accent line
+    c.setStrokeColorRGB(*accent)
+    c.setLineWidth(1)
+    c.line(20, H * 0.52, W - 20, H * 0.52)
+
+    # Name
+    c.setFillColorRGB(*text_c)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(20, H - 38, name)
+
+    # Title
+    c.setFillColorRGB(*accent)
+    c.setFont("Helvetica-Oblique", 10)
+    c.drawString(20, H - 56, title)
+
+    # Company
+    if company:
+        c.setFillColorRGB(*text_c)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(20, H - 72, company)
+
+    # Contact info
+    c.setFont("Helvetica", 9)
+    c.setFillColorRGB(*text_c)
+    y = 52
+    if phone:
+        c.drawString(20, y, f"📞  {phone}")
+        y -= 16
+    if email:
+        c.drawString(20, y, f"✉️  {email}")
+
+    c.save()
+    return buf.getvalue()
+
+
+def create_flyer(title: str, subtitle: str, details: str,
+                 date_time: str = "", theme: str = "event") -> bytes:
+    """Eye-catching event flyer PDF (A5)."""
+    from reportlab.lib.pagesizes import A5
+    from reportlab.pdfgen import canvas as rl_canvas
+    from reportlab.lib import colors
+    from config import FLYER_THEMES
+    t    = FLYER_THEMES.get(theme, FLYER_THEMES["event"])
+    W, H = A5
+    buf  = io.BytesIO()
+    c    = rl_canvas.Canvas(buf, pagesize=A5)
+
+    bg     = tuple(v/255 for v in t["bg"])
+    accent = tuple(v/255 for v in t["accent"])
+    text_c = tuple(v/255 for v in t["text"])
+
+    # BG
+    c.setFillColorRGB(*bg)
+    c.rect(0, 0, W, H, fill=1, stroke=0)
+
+    # Top accent strip
+    c.setFillColorRGB(*accent)
+    c.rect(0, H - 90, W, 90, fill=1, stroke=0)
+
+    # Bottom accent strip
+    c.rect(0, 0, W, 55, fill=1, stroke=0)
+
+    # Decorative diagonal lines
+    c.setStrokeColorRGB(*accent)
+    c.setLineWidth(2)
+    c.setFillColorRGB(*accent, )
+    for x in range(-100, int(W)+200, 30):
+        c.setStrokeAlpha(0.08)
+        c.line(x, 0, x + 120, H)
+
+    # Title inside top strip
+    c.setFillColorRGB(*text_c)
+    c.setFont("Helvetica-Bold", 28)
+    c.drawCentredString(W/2, H - 58, title)
+
+    # Subtitle
+    c.setFont("Helvetica-Bold", 18)
+    c.setFillColorRGB(*accent)
+    c.drawCentredString(W/2, H - 120, subtitle)
+
+    # Details
+    c.setFont("Helvetica", 13)
+    c.setFillColorRGB(*text_c)
+    words  = details.split()
+    lines  = []
+    line   = ""
+    for word in words:
+        test = (line + " " + word).strip()
+        if c.stringWidth(test, "Helvetica", 13) > W - 80:
+            lines.append(line)
+            line = word
+        else:
+            line = test
+    if line:
+        lines.append(line)
+    y = H - 170
+    for ln in lines:
+        c.drawCentredString(W/2, y, ln)
+        y -= 22
+
+    # Date/time
+    if date_time:
+        c.setFillColorRGB(*accent)
+        c.setFont("Helvetica-Bold", 16)
+        c.drawCentredString(W/2, 80, date_time)
+
+    c.setFillColorRGB(*text_c)
+    c.setFont("Helvetica", 9)
+    c.drawCentredString(W/2, 20, "Made with Nexora PDF Doctor Bot")
+
+    c.save()
+    return buf.getvalue()
+
+
+def create_timetable(schedule: dict, title: str = "My Timetable") -> bytes:
+    """
+    Generate a weekly timetable PDF.
+    schedule: {"Monday": ["9:00 Math", "10:00 English"], ...}
+    """
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.pdfgen import canvas as rl_canvas
+    from reportlab.lib import colors
+    W, H = landscape(A4)
+    buf  = io.BytesIO()
+    c    = rl_canvas.Canvas(buf, pagesize=landscape(A4))
+
+    days = [d for d in ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+            if d in schedule]
+    if not days:
+        raise ValueError("No valid days in schedule!")
+
+    col_w   = (W - 80) / len(days)
+    row_h   = 30
+    header_h = 50
+
+    # Background
+    c.setFillColorRGB(0.97, 0.97, 1.0)
+    c.rect(0, 0, W, H, fill=1, stroke=0)
+
+    # Title
+    c.setFillColorRGB(0.1, 0.1, 0.4)
+    c.setFont("Helvetica-Bold", 20)
+    c.drawCentredString(W/2, H - 35, title)
+
+    # Headers
+    for i, day in enumerate(days):
+        x = 40 + i * col_w
+        c.setFillColorRGB(0.2, 0.3, 0.7)
+        c.rect(x, H - 60 - header_h, col_w - 4, header_h, fill=1, stroke=0)
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont("Helvetica-Bold", 12)
+        c.drawCentredString(x + col_w/2 - 2, H - 60 - header_h + 16, day[:3].upper())
+
+    # Rows
+    max_slots = max(len(v) for v in schedule.values()) if schedule else 8
+    for slot in range(max_slots):
+        y = H - 60 - header_h - (slot + 1) * row_h
+        if y < 30:
+            break
+        # Row BG alternating
+        row_bg = (0.92, 0.94, 1.0) if slot % 2 == 0 else (1, 1, 1)
+        c.setFillColorRGB(*row_bg)
+        c.rect(40, y, W - 80, row_h - 2, fill=1, stroke=0)
+
+        for i, day in enumerate(days):
+            x    = 40 + i * col_w
+            slots = schedule.get(day, [])
+            if slot < len(slots):
+                c.setFillColorRGB(0.1, 0.1, 0.3)
+                c.setFont("Helvetica", 9)
+                c.drawString(x + 4, y + 9, str(slots[slot])[:25])
+
+    # Grid lines
+    c.setStrokeColorRGB(0.7, 0.7, 0.9)
+    c.setLineWidth(0.5)
+    for i in range(len(days) + 1):
+        x = 40 + i * col_w
+        c.line(x, H - 60 - header_h, x, 30)
+
+    c.save()
+    return buf.getvalue()
+
+
+# =============================================================================
+# v6 — UX / Bot helpers
+# =============================================================================
+
+def format_streak_message(streak: int) -> str:
+    """Return motivational streak message."""
+    from config import STREAK_BONUS_OPS
+    msgs = {
+        1:  "🔥 Day 1 streak! Keep going!",
+        3:  "🔥🔥 3-day streak! You're on fire!",
+        7:  "💎 7-day streak! One week strong!",
+        14: "🏆 14-day streak! Amazing dedication!",
+        30: "🌟 30-day streak! LEGENDARY!",
+    }
+    bonus = STREAK_BONUS_OPS.get(streak, 0)
+    base  = msgs.get(streak, f"🔥 {streak}-day streak!")
+    if bonus:
+        base += f"\n🎁 Bonus: +{bonus} free ops today!"
+    return base
+
+
+def get_plan_badge(plan: str) -> str:
+    return {"free": "🆓 Free", "basic": "⭐ Basic", "pro": "👑 Pro"}.get(plan, "🆓 Free")
