@@ -286,3 +286,69 @@ PWD_CRACK_COMMON_LIST = [
     "asdf","asdfgh","zxcvbnm","1111","2222","3333","4444","5555",
     "6666","7777","8888","9999","0000","9876","1357","2468",
 ]
+
+# ─── v7: Coin System ─────────────────────────────────────────────────────────
+COIN_REWARDS = {
+    "daily_login":   5,
+    "refer_friend":  20,
+    "feedback":      10,
+    "streak_7":      15,
+    "streak_30":     50,
+    "first_premium": 100,
+}
+COIN_COSTS = {
+    "extra_op":      10,   # 10 coins = 1 bonus op
+    "trial_day":     30,   # 30 coins = 1 day trial
+    "unlock_pro_op": 50,   # 50 coins = 1 pro feature use
+}
+
+# ─── v7: Trial System ────────────────────────────────────────────────────────
+TRIAL_DURATION_DAYS = 3
+TRIAL_PLAN          = "basic"
+
+# ─── v7: Promo Codes ─────────────────────────────────────────────────────────
+PROMO_CODES = {
+    "NEXORA50":   {"type": "coins",    "value": 50,  "max_uses": 1000},
+    "STUDENT2024":{"type": "trial",    "value": 7,   "max_uses": 500},
+    "WELCOME100": {"type": "coins",    "value": 100, "max_uses": 100},
+    "FREEPRO":    {"type": "plan",     "value": "pro","max_uses": 10,  "days": 3},
+}
+
+# ─── v7: Student Tools ───────────────────────────────────────────────────────
+FLASHCARD_THEMES = {
+    "classic": {"bg": (255,255,255), "front": (30,30,80),   "back": (240,248,255)},
+    "dark":    {"bg": (18,18,30),    "front": (200,200,255), "back": (30,30,60)},
+    "nature":  {"bg": (230,255,230), "front": (20,60,20),    "back": (200,240,200)},
+    "pink":    {"bg": (255,235,245), "front": (100,20,60),   "back": (255,220,240)},
+}
+
+MINDMAP_COLORS = [
+    (255,80,80), (80,180,255), (80,220,80),
+    (255,180,0), (180,80,255),(255,120,0),
+]
+
+# ─── v7: Auto-Detect MIME types ──────────────────────────────────────────────
+AUTO_DETECT_ACTIONS = {
+    "application/pdf":       ["compress","split","pdf_info","pdf2txt","ocr"],
+    "image/jpeg":            ["img_compress","img_filter","img_resize","img_meme"],
+    "image/png":             ["img_compress","img_filter","img_sticker","img_bgremove"],
+    "text/plain":            ["txt2pdf","notes"],
+    "text/csv":              ["csv2pdf"],
+    "application/json":      ["json2pdf"],
+    "text/html":             ["html2pdf"],
+    "application/zip":       ["unzip","fileinfo"],
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ["doc2pdf"],
+    "application/epub+zip":  ["epub2pdf"],
+}
+
+# ─── v7: Achievement Badges ──────────────────────────────────────────────────
+ACHIEVEMENTS = {
+    "first_step":    {"emoji": "👶", "name": "First Step",       "desc": "First file processed!", "ops": 1},
+    "getting_going": {"emoji": "🏃", "name": "Getting Going",    "desc": "10 files processed",    "ops": 10},
+    "power_user":    {"emoji": "💪", "name": "Power User",       "desc": "50 files processed",    "ops": 50},
+    "pdf_master":    {"emoji": "🎓", "name": "PDF Master",       "desc": "100 files processed",   "ops": 100},
+    "legend":        {"emoji": "🏆", "name": "Legend",           "desc": "500 files processed",   "ops": 500},
+    "week_streak":   {"emoji": "🔥", "name": "Week Warrior",     "desc": "7-day streak!",         "streak": 7},
+    "month_streak":  {"emoji": "💎", "name": "Month Master",     "desc": "30-day streak!",        "streak": 30},
+    "social_star":   {"emoji": "⭐", "name": "Social Star",      "desc": "Referred 5 friends",    "refs": 5},
+}

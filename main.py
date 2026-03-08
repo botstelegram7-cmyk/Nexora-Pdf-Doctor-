@@ -1,9 +1,10 @@
 """
-Nexora PDF Doctor Bot v6.0 — Main Entry Point
-New in v6: Stamp, Grayscale, Extract Images, Word Count, Headers, Bookmarks,
-           Image Collage, Meme, Sticker, ASCII Art, Flip, Border, Round Corners,
-           EXIF View/Strip, Auto Enhance, Quote Card, Birthday Card, Business Card,
-           Flyer, Timetable, Feedback, Referral, Streak System, Daily Bonus
+Nexora PDF Doctor Bot v7.0 — Main Entry Point
+=====================================================
+v7 New: Auto-detect files, Animated progress bars, Quick action buttons,
+        Coin system, Trial, Promo codes, Achievements, Stats card, Leaderboard,
+        Flashcards, Mind maps, Study schedule, Assignment tracker, Pomodoro,
+        PDF Flatten, PDF Annotate, PDF Split by Size, PDF Table Extract
 """
 import asyncio, logging, traceback
 from aiohttp import web
@@ -21,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ── Handler imports ───────────────────────────────────────────────────────────
-from handlers.start_handler import start_cmd, help_cmd, account_cmd
+from handlers.start_handler   import start_cmd, help_cmd, account_cmd
 from handlers.premium_handler import (
     premium_cmd, grant_premium_cmd, buy_plan_callback, pay_screenshot_callback,
 )
@@ -35,54 +36,68 @@ from handlers.pdf_handler import (
     cmd_delete_pages, cmd_reorder, cmd_lang, cmd_reverse, cmd_compare,
 )
 from handlers.new_features_handler import (
-    # v5 PDF tools
     cmd_pdf2txt, cmd_linearize, cmd_thumbnail, cmd_pdf_info,
     cmd_redact, cmd_impose, cmd_deskew, cmd_pwd_strength, cmd_pwd_crack,
     cmd_metadata_edit,
-    # v5 Image
     cmd_img_compress, cmd_img_resize, cmd_img_crop, cmd_img_filter,
     cmd_img_text, cmd_img2jpg, cmd_img2png, cmd_img_bgremove,
-    # v5 Doc converters
     cmd_csv2pdf, cmd_txt2pdf, cmd_html2pdf, cmd_json2pdf,
     cmd_doc2pdf, cmd_pdf2epub, cmd_epub2pdf,
-    # v5 Security
     cmd_hash, cmd_steganography, cmd_pdf_sign,
-    # v5 Creative
     cmd_poster, cmd_calendar_pdf, cmd_invoice, cmd_resume, cmd_certificate,
-    # v5 Utility
     cmd_zip, cmd_unzip, cmd_fileinfo, cmd_qrcode_scan, cmd_barcode,
-    # v5 UX
     cmd_remind, cmd_notes, cmd_history,
-    # v5 Handlers
     handle_new_features, handle_new_callbacks,
-    # v6 PDF tools
     cmd_pdf_stamp, cmd_pdf_grayscale, cmd_pdf_extract_imgs,
     cmd_pdf_remove_meta, cmd_pdf_word_count, cmd_pdf_header, cmd_pdf_bookmark,
-    # v6 Image tools
     cmd_img_collage, cmd_img_meme, cmd_img_sticker, cmd_img_ascii,
     cmd_img_flip, cmd_img_border, cmd_img_round, cmd_img_exif,
     cmd_img_remove_exif, cmd_img_enhance,
-    # v6 Creative
     cmd_quote_card, cmd_birthday_card, cmd_business_card, cmd_flyer, cmd_timetable,
-    # v6 UX
     cmd_feedback, cmd_referral, cmd_streak,
-    # v6 Handlers
     handle_new_features_v6, handle_new_callbacks_v6,
+)
+from handlers.v7_handler import (
+    # UX
+    auto_detect_and_suggest, notify_achievements, award_coins_for_op,
+    # Monetize
+    cmd_coins, cmd_earn, cmd_trial, cmd_redeem,
+    # Engagement
+    cmd_badges, cmd_stats_card, cmd_top,
+    # Student
+    cmd_flashcard, cmd_mindmap, cmd_study_schedule, cmd_assign, cmd_pomodoro,
+    # PDF Advanced
+    cmd_pdf_flatten, cmd_pdf_split_size, cmd_pdf_annotate, cmd_pdf_table,
+    # Handlers
+    handle_v7_features, handle_v7_callbacks,
 )
 from handlers.admin_handler import admin_panel
 
-# ── Bot command list ──────────────────────────────────────────────────────────
+# ── Bot Commands ──────────────────────────────────────────────────────────────
 BOT_COMMANDS = [
     BotCommand("start",             "🏠 Main Menu"),
     BotCommand("help",              "❓ Help & Commands"),
     BotCommand("account",           "👤 My Account"),
     BotCommand("dashboard",         "📊 Usage Dashboard"),
     BotCommand("premium",           "💎 Premium Plans"),
-    BotCommand("lang",              "🌍 Change Language"),
-    BotCommand("streak",            "🔥 My Daily Streak"),
+    BotCommand("trial",             "🎁 Free 3-Day Trial"),
+    BotCommand("redeem",            "🎟️ Redeem Promo Code"),
+    BotCommand("coins",             "🪙 My Coins"),
+    BotCommand("earn",              "💰 Earn Coins"),
+    BotCommand("streak",            "🔥 Daily Streak"),
+    BotCommand("badges",            "🏅 Achievements"),
+    BotCommand("stats_card",        "📊 Stats Card (Shareable)"),
+    BotCommand("top",               "🏆 Leaderboard"),
     BotCommand("referral",          "👥 Refer & Earn"),
     BotCommand("feedback",          "⭐ Rate the Bot"),
-    # PDF
+    BotCommand("lang",              "🌍 Language"),
+    # Student Tools
+    BotCommand("flashcard",         "📚 Flashcard Maker"),
+    BotCommand("mindmap",           "🧠 Mind Map Generator"),
+    BotCommand("study_schedule",    "📅 Study Schedule"),
+    BotCommand("assign",            "📋 Assignment Tracker"),
+    BotCommand("pomodoro",          "🍅 Pomodoro Timer"),
+    # PDF Tools
     BotCommand("compress",          "📐 Compress PDF"),
     BotCommand("split",             "✂️ Split PDF"),
     BotCommand("merge",             "🔗 Merge PDFs"),
@@ -92,20 +107,24 @@ BOT_COMMANDS = [
     BotCommand("pdf2txt",           "📄 PDF to Text"),
     BotCommand("linearize",         "🌐 Web Optimize PDF"),
     BotCommand("thumbnail",         "🖼️ PDF Preview"),
-    BotCommand("pdf_info",          "🔍 Deep PDF Analysis"),
+    BotCommand("pdf_info",          "🔍 PDF Deep Analysis"),
     BotCommand("redact",            "⬛ Redact Text"),
-    BotCommand("impose",            "📋 2-up/4-up Layout"),
+    BotCommand("impose",            "📋 2-up / 4-up"),
     BotCommand("deskew",            "📐 Fix Crooked Scan"),
     BotCommand("pdf_stamp",         "🖊️ Stamp PDF"),
-    BotCommand("pdf_grayscale",     "⬛ PDF to Grayscale"),
+    BotCommand("pdf_grayscale",     "⬛ PDF Grayscale"),
     BotCommand("pdf_extract_imgs",  "🖼️ Extract Images"),
-    BotCommand("pdf_remove_meta",   "🗑️ Strip PDF Metadata"),
-    BotCommand("pdf_word_count",    "📊 PDF Word Count"),
-    BotCommand("pdf_header",        "🔢 Add PDF Header"),
+    BotCommand("pdf_remove_meta",   "🗑️ Strip Metadata"),
+    BotCommand("pdf_word_count",    "📊 Word Count"),
+    BotCommand("pdf_header",        "🔢 Add Header"),
     BotCommand("pdf_bookmark",      "🔖 View Bookmarks"),
+    BotCommand("pdf_flatten",       "📋 Flatten Forms"),
+    BotCommand("pdf_split_size",    "✂️ Split by Size"),
+    BotCommand("pdf_annotate",      "🖊️ Highlight Text"),
+    BotCommand("pdf_table",         "📊 Extract Tables"),
     BotCommand("pwd_strength",      "🔐 Password Strength"),
     BotCommand("pwd_crack",         "🔓 PDF Password Crack 👑"),
-    BotCommand("metadata_edit",     "✏️ Edit PDF Metadata"),
+    BotCommand("metadata_edit",     "✏️ Edit Metadata"),
     # Visual
     BotCommand("watermark",         "🌊 Watermark"),
     BotCommand("darkmode",          "🌙 Dark Mode"),
@@ -113,16 +132,15 @@ BOT_COMMANDS = [
     BotCommand("bgchange",          "🎨 BG Color"),
     BotCommand("rotate",            "🔄 Rotate"),
     BotCommand("resize",            "📏 Resize A4"),
-    # Convert PDF
+    # Convert
     BotCommand("pdf2img",           "🖼️ PDF to Images"),
     BotCommand("img2pdf",           "🖼️ Images to PDF"),
     BotCommand("excel",             "📊 PDF to Excel"),
     BotCommand("pdf2word",          "📄 PDF to Word"),
-    BotCommand("pdf2ppt",           "📊 PDF to PPT 👑"),
-    BotCommand("pdf2epub",          "📚 PDF to EPUB ⭐"),
+    BotCommand("pdf2epub",          "📚 PDF to EPUB"),
     BotCommand("epub2pdf",          "📖 EPUB to PDF"),
     BotCommand("doc2pdf",           "📝 Word to PDF"),
-    # Image Tools
+    # Image
     BotCommand("img_compress",      "📦 Compress Image"),
     BotCommand("img_resize",        "📏 Resize Image"),
     BotCommand("img_crop",          "✂️ Crop Image"),
@@ -130,18 +148,18 @@ BOT_COMMANDS = [
     BotCommand("img_text",          "📝 Text on Image"),
     BotCommand("img2jpg",           "🖼️ To JPG"),
     BotCommand("img2png",           "🖼️ To PNG"),
-    BotCommand("img_bgremove",      "✂️ Remove BG ⭐"),
-    BotCommand("img_collage",       "🖼️ Image Collage"),
+    BotCommand("img_bgremove",      "✂️ Remove BG"),
+    BotCommand("img_collage",       "🖼️ Collage"),
     BotCommand("img_meme",          "😂 Meme Generator"),
     BotCommand("img_sticker",       "🎭 Make Sticker"),
     BotCommand("img_ascii",         "🔤 ASCII Art"),
     BotCommand("img_flip",          "🔄 Flip Image"),
     BotCommand("img_border",        "🖼️ Add Border"),
     BotCommand("img_round",         "⭕ Rounded Corners"),
-    BotCommand("img_exif",          "📷 View EXIF Data"),
+    BotCommand("img_exif",          "📷 View EXIF"),
     BotCommand("img_remove_exif",   "🧹 Strip EXIF"),
     BotCommand("img_enhance",       "✨ Auto Enhance"),
-    # Doc Converters
+    # Doc Convert
     BotCommand("csv2pdf",           "📊 CSV to PDF"),
     BotCommand("txt2pdf",           "📄 TXT to PDF"),
     BotCommand("html2pdf",          "🌐 HTML to PDF"),
@@ -161,6 +179,7 @@ BOT_COMMANDS = [
     BotCommand("invoice",           "🧾 Invoice"),
     BotCommand("resume",            "📋 Resume Builder"),
     BotCommand("certificate",       "🏆 Certificate"),
+    BotCommand("handwrite",         "✍️ Handwritten PDF"),
     # Pages
     BotCommand("extract",           "🔖 Extract Pages"),
     BotCommand("delete_pages",      "🗑️ Delete Pages"),
@@ -170,7 +189,6 @@ BOT_COMMANDS = [
     # Smart Tools
     BotCommand("ocr",               "👁️ OCR Text"),
     BotCommand("metadata",          "📋 View Metadata"),
-    BotCommand("handwrite",         "✍️ Handwritten PDF"),
     BotCommand("addtext",           "📝 Add Text"),
     BotCommand("footer",            "🗂️ Footer"),
     BotCommand("crop",              "✂️ Crop Margins"),
@@ -188,7 +206,7 @@ BOT_COMMANDS = [
 ]
 
 
-# ── File size check ───────────────────────────────────────────────────────────
+# ── File size guard ───────────────────────────────────────────────────────────
 
 async def check_file_size(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
     msg = update.message
@@ -206,44 +224,41 @@ async def check_file_size(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> boo
     max_mb    = MAX_FILE_SIZE_MB.get(plan, 20)
     max_bytes = max_mb * 1024 * 1024
     if file_size > max_bytes:
-        actual_mb  = round(file_size / 1024 / 1024, 1)
-        plan_lines = "\n".join(
-            f"  {'✅' if p == plan else '•'} {p.title()}: {mb}MB"
-            for p, mb in MAX_FILE_SIZE_MB.items()
-        )
+        actual_mb = round(file_size / 1024 / 1024, 1)
         await msg.reply_text(
             f"⚠️ <b>File Too Large!</b>\n\n"
             f"📦 Your file: <b>{actual_mb}MB</b>\n"
             f"🚫 Your limit: <b>{max_mb}MB</b> ({plan.title()} plan)\n\n"
-            f"📊 <b>Limits by plan:</b>\n{plan_lines}\n\n"
-            f"💎 Upgrade → /premium",
+            f"💡 /trial for free upgrade  |  /premium for full access",
             parse_mode="HTML",
         )
         return False
     return True
 
 
-# ── Daily bonus & streak on first message ─────────────────────────────────────
+# ── Daily bonus + streak + trial expiry check ─────────────────────────────────
 
-async def handle_daily_bonus(user_id: int, bot, chat_id: int):
-    """Award daily bonus + update streak on first use of day."""
+async def handle_daily_events(user_id: int, bot, chat_id: int):
     try:
-        from database import claim_daily_bonus, update_streak
+        from database import claim_daily_bonus, update_streak, check_trial_expiry
         from config import DAILY_BONUS_OPS
-        from utils.pdf_utils import format_streak_message
-        bonus_given = await claim_daily_bonus(user_id)
-        streak, is_milestone, bonus_ops = await update_streak(user_id)
+        await check_trial_expiry(user_id)
+        bonus_given           = await claim_daily_bonus(user_id)
+        streak, milestone, _  = await update_streak(user_id)
         msgs = []
         if bonus_given:
-            msgs.append(f"🎁 <b>Daily Bonus!</b> +{DAILY_BONUS_OPS} free ops!")
-        if is_milestone:
-            msgs.append(format_streak_message(streak))
-        if msgs:
-            await bot.send_message(
-                chat_id=chat_id,
-                text="\n\n".join(msgs),
-                parse_mode="HTML"
+            msgs.append(f"🎁 <b>Daily Bonus!</b> +{DAILY_BONUS_OPS} free ops + <b>5 🪙 coins</b>!")
+            from database import add_coins
+            await add_coins(user_id, 5, "daily_login")
+        if milestone:
+            from config import STREAK_BONUS_OPS
+            bonus = STREAK_BONUS_OPS.get(streak, 0)
+            msgs.append(
+                f"🔥 <b>{streak}-Day Streak!</b> Amazing!\n"
+                f"{'🎁 Bonus: +' + str(bonus) + ' ops today!' if bonus else ''}"
             )
+        if msgs:
+            await bot.send_message(chat_id=chat_id, text="\n\n".join(msgs), parse_mode="HTML")
     except Exception:
         pass
 
@@ -256,24 +271,34 @@ async def unified_message_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE
     await ensure_user(user.id, user.full_name, user.username or "")
     if not await check_file_size(update, ctx):
         return
-    # Daily bonus (fire-and-forget, non-blocking)
-    asyncio.create_task(handle_daily_bonus(user.id, ctx.bot, update.effective_chat.id))
-    # Try v6 handler first, then v5, then original
-    handled = await handle_new_features_v6(update, ctx)
-    if not handled:
-        handled = await handle_new_features(update, ctx)
-    if not handled:
-        await handle_message(update, ctx)
+    asyncio.create_task(handle_daily_events(user.id, ctx.bot, update.effective_chat.id))
+
+    # Handler priority: v7 → auto-detect → v6 → v5 → original
+    if await handle_v7_features(update, ctx):
+        return
+    if await handle_new_features_v6(update, ctx):
+        return
+    if await handle_new_features(update, ctx):
+        return
+    # Auto-detect file when no state active
+    if update.message and (update.message.document or update.message.photo):
+        state = ctx.user_data.get("state", "")
+        if not state:
+            if await auto_detect_and_suggest(update, ctx):
+                return
+    await handle_message(update, ctx)
 
 
 # ── Unified callback handler ──────────────────────────────────────────────────
 
 async def unified_callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    handled = await handle_new_callbacks_v6(update, ctx)
-    if not handled:
-        handled = await handle_new_callbacks(update, ctx)
-    if not handled:
-        await menu_callback(update, ctx)
+    if await handle_v7_callbacks(update, ctx):
+        return
+    if await handle_new_callbacks_v6(update, ctx):
+        return
+    if await handle_new_callbacks(update, ctx):
+        return
+    await menu_callback(update, ctx)
 
 
 # ── Error handler ─────────────────────────────────────────────────────────────
@@ -287,7 +312,8 @@ async def error_handler(update: object, ctx: ContextTypes.DEFAULT_TYPE):
     if update and isinstance(update, Update) and update.effective_message:
         try:
             await update.effective_message.reply_text(
-                f"⚠️ <b>Error!</b> <code>{str(err)[:200]}</code>\n\nTry again or /start",
+                f"⚠️ <b>Oops!</b> Something went wrong.\n"
+                f"<code>{str(err)[:200]}</code>\n\nTry again or /start",
                 parse_mode="HTML",
             )
         except Exception:
@@ -297,7 +323,7 @@ async def error_handler(update: object, ctx: ContextTypes.DEFAULT_TYPE):
             tb = "".join(traceback.format_exception(type(err), err, err.__traceback__))
             await ctx.bot.send_message(
                 chat_id=OWNER_ID,
-                text=f"🚨 <b>Bot Error!</b>\n\n<pre>{tb[:3000]}</pre>",
+                text=f"🚨 <b>Error!</b>\n\n<pre>{tb[:3000]}</pre>",
                 parse_mode="HTML",
             )
         except Exception:
@@ -310,13 +336,13 @@ async def broadcast_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
         return
     if not ctx.args:
-        await update.message.reply_text("Usage: /broadcast your message")
+        await update.message.reply_text("Usage: /broadcast <message>")
         return
     text  = " ".join(ctx.args)
     from database import get_all_users
     users = await get_all_users()
     total = len(users)
-    sent  = failed = 0
+    sent = failed = 0
     prog  = await update.message.reply_text(f"📢 Broadcasting to {total} users...")
     for i, u in enumerate(users):
         try:
@@ -331,16 +357,13 @@ async def broadcast_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await asyncio.sleep(BROADCAST_DELAY_SEC)
         if (i + 1) % BROADCAST_BATCH == 0:
             try:
-                await prog.edit_text(f"📢 {i+1}/{total} — ✅ {sent} ❌ {failed}")
+                await prog.edit_text(f"📢 {i+1}/{total} — ✅{sent} ❌{failed}")
             except Exception:
                 pass
-    await prog.edit_text(
-        f"📢 <b>Broadcast Done!</b>\n✅ {sent}\n❌ {failed}",
-        parse_mode="HTML",
-    )
+    await prog.edit_text(f"📢 <b>Done!</b>\n✅ {sent}\n❌ {failed}", parse_mode="HTML")
 
 
-# ── Stats ─────────────────────────────────────────────────────────────────────
+# ── Stats (admin) ─────────────────────────────────────────────────────────────
 
 async def stats_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
@@ -349,14 +372,14 @@ async def stats_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     s  = await get_admin_stats()
     fb = await get_feedback_stats()
     await update.message.reply_text(
-        f"📊 <b>Nexora Bot v6.0 Stats</b>\n\n"
+        f"📊 <b>Nexora Bot v7.0 Stats</b>\n\n"
         f"👥 Total: <b>{s['total_users']}</b>\n"
         f"🆓 Free: <b>{s['free_users']}</b>\n"
         f"⭐ Basic: <b>{s['basic_users']}</b>\n"
         f"👑 Pro: <b>{s['pro_users']}</b>\n"
         f"📆 Active today: <b>{s['today_active']}</b>\n"
         f"⚡ Ops today: <b>{s['today_ops']}</b>\n"
-        f"💳 Pending payments: <b>{s['pending_payments']}</b>\n\n"
+        f"💳 Pending: <b>{s['pending_payments']}</b>\n\n"
         f"⭐ Avg rating: <b>{fb['avg_rating']}/5</b> ({fb['total']} reviews)",
         parse_mode="HTML",
     )
@@ -368,8 +391,7 @@ async def reminder_scheduler(bot):
     from database import get_due_reminders, mark_reminder_done
     while True:
         try:
-            reminders = await get_due_reminders()
-            for r in reminders:
+            for r in await get_due_reminders():
                 try:
                     await bot.send_message(
                         chat_id=r["chat_id"],
@@ -378,9 +400,9 @@ async def reminder_scheduler(bot):
                     )
                     await mark_reminder_done(r["id"])
                 except Exception as e:
-                    logger.warning(f"Reminder failed: {e}")
+                    logger.warning(f"Reminder: {e}")
         except Exception as e:
-            logger.error(f"Reminder scheduler: {e}")
+            logger.error(f"Scheduler: {e}")
         await asyncio.sleep(30)
 
 
@@ -390,155 +412,137 @@ def build_app() -> Application:
     app = (
         Application.builder()
         .token(BOT_TOKEN)
-        .connect_timeout(30)
-        .read_timeout(30)
-        .write_timeout(60)
-        .pool_timeout(30)
+        .connect_timeout(30).read_timeout(30)
+        .write_timeout(60).pool_timeout(30)
         .build()
     )
 
+    def cmd(name, func):
+        app.add_handler(CommandHandler(name, func))
+
     # Core
-    app.add_handler(CommandHandler("start",             start_cmd))
-    app.add_handler(CommandHandler("help",              help_cmd))
-    app.add_handler(CommandHandler("account",           account_cmd))
-    app.add_handler(CommandHandler("dashboard",         cmd_dashboard))
-    app.add_handler(CommandHandler("premium",           premium_cmd))
-    app.add_handler(CommandHandler("lang",              cmd_lang))
-    app.add_handler(CommandHandler("streak",            cmd_streak))
-    app.add_handler(CommandHandler("referral",          cmd_referral))
-    app.add_handler(CommandHandler("feedback",          cmd_feedback))
+    cmd("start",             start_cmd)
+    cmd("help",              help_cmd)
+    cmd("account",           account_cmd)
+    cmd("dashboard",         cmd_dashboard)
+    cmd("premium",           premium_cmd)
+    cmd("lang",              cmd_lang)
+
+    # v7 UX & Monetization
+    cmd("trial",             cmd_trial)
+    cmd("redeem",            cmd_redeem)
+    cmd("coins",             cmd_coins)
+    cmd("earn",              cmd_earn)
+    cmd("streak",            cmd_streak)
+    cmd("badges",            cmd_badges)
+    cmd("stats_card",        cmd_stats_card)
+    cmd("top",               cmd_top)
+    cmd("referral",          cmd_referral)
+    cmd("feedback",          cmd_feedback)
+
+    # v7 Student Tools
+    cmd("flashcard",         cmd_flashcard)
+    cmd("mindmap",           cmd_mindmap)
+    cmd("study_schedule",    cmd_study_schedule)
+    cmd("assign",            cmd_assign)
+    cmd("pomodoro",          cmd_pomodoro)
+
+    # v7 PDF Advanced
+    cmd("pdf_flatten",       cmd_pdf_flatten)
+    cmd("pdf_split_size",    cmd_pdf_split_size)
+    cmd("pdf_annotate",      cmd_pdf_annotate)
+    cmd("pdf_table",         cmd_pdf_table)
 
     # Original PDF
-    app.add_handler(CommandHandler("compress",          cmd_compress))
-    app.add_handler(CommandHandler("split",             cmd_split))
-    app.add_handler(CommandHandler("merge",             cmd_merge))
-    app.add_handler(CommandHandler("lock",              cmd_lock))
-    app.add_handler(CommandHandler("unlock",            cmd_unlock))
-    app.add_handler(CommandHandler("repair",            cmd_repair))
-    app.add_handler(CommandHandler("watermark",         cmd_watermark))
-    app.add_handler(CommandHandler("darkmode",          cmd_darkmode))
-    app.add_handler(CommandHandler("pagenos",           cmd_pagenos))
-    app.add_handler(CommandHandler("pdf2img",           cmd_pdf2img))
-    app.add_handler(CommandHandler("img2pdf",           cmd_img2pdf))
-    app.add_handler(CommandHandler("excel",             cmd_excel))
-    app.add_handler(CommandHandler("bgchange",          cmd_bgchange))
-    app.add_handler(CommandHandler("handwrite",         cmd_handwrite))
-    app.add_handler(CommandHandler("ocr",               cmd_ocr))
-    app.add_handler(CommandHandler("rotate",            cmd_rotate))
-    app.add_handler(CommandHandler("resize",            cmd_resize))
-    app.add_handler(CommandHandler("addtext",           cmd_addtext))
-    app.add_handler(CommandHandler("footer",            cmd_footer))
-    app.add_handler(CommandHandler("extract",           cmd_extract))
-    app.add_handler(CommandHandler("metadata",          cmd_metadata))
-    app.add_handler(CommandHandler("pdf2word",          cmd_pdf2word))
-    app.add_handler(CommandHandler("pdf2ppt",           cmd_pdf2ppt))
-    app.add_handler(CommandHandler("crop",              cmd_crop))
-    app.add_handler(CommandHandler("qr",                cmd_qr))
-    app.add_handler(CommandHandler("delete_pages",      cmd_delete_pages))
-    app.add_handler(CommandHandler("reorder",           cmd_reorder))
-    app.add_handler(CommandHandler("reverse",           cmd_reverse))
-    app.add_handler(CommandHandler("compare",           cmd_compare))
+    for name, func in [
+        ("compress", cmd_compress), ("split", cmd_split), ("merge", cmd_merge),
+        ("lock", cmd_lock), ("unlock", cmd_unlock), ("repair", cmd_repair),
+        ("watermark", cmd_watermark), ("darkmode", cmd_darkmode), ("pagenos", cmd_pagenos),
+        ("pdf2img", cmd_pdf2img), ("img2pdf", cmd_img2pdf), ("excel", cmd_excel),
+        ("bgchange", cmd_bgchange), ("handwrite", cmd_handwrite), ("ocr", cmd_ocr),
+        ("rotate", cmd_rotate), ("resize", cmd_resize), ("addtext", cmd_addtext),
+        ("footer", cmd_footer), ("extract", cmd_extract), ("metadata", cmd_metadata),
+        ("pdf2word", cmd_pdf2word), ("pdf2ppt", cmd_pdf2ppt), ("crop", cmd_crop),
+        ("qr", cmd_qr), ("delete_pages", cmd_delete_pages), ("reorder", cmd_reorder),
+        ("reverse", cmd_reverse), ("compare", cmd_compare),
+    ]:
+        cmd(name, func)
 
     # v5 PDF
-    app.add_handler(CommandHandler("pdf2txt",           cmd_pdf2txt))
-    app.add_handler(CommandHandler("linearize",         cmd_linearize))
-    app.add_handler(CommandHandler("thumbnail",         cmd_thumbnail))
-    app.add_handler(CommandHandler("pdf_info",          cmd_pdf_info))
-    app.add_handler(CommandHandler("redact",            cmd_redact))
-    app.add_handler(CommandHandler("impose",            cmd_impose))
-    app.add_handler(CommandHandler("deskew",            cmd_deskew))
-    app.add_handler(CommandHandler("pwd_strength",      cmd_pwd_strength))
-    app.add_handler(CommandHandler("pwd_crack",         cmd_pwd_crack))
-    app.add_handler(CommandHandler("metadata_edit",     cmd_metadata_edit))
+    for name, func in [
+        ("pdf2txt", cmd_pdf2txt), ("linearize", cmd_linearize), ("thumbnail", cmd_thumbnail),
+        ("pdf_info", cmd_pdf_info), ("redact", cmd_redact), ("impose", cmd_impose),
+        ("deskew", cmd_deskew), ("pwd_strength", cmd_pwd_strength), ("pwd_crack", cmd_pwd_crack),
+        ("metadata_edit", cmd_metadata_edit),
+    ]:
+        cmd(name, func)
 
     # v6 PDF
-    app.add_handler(CommandHandler("pdf_stamp",         cmd_pdf_stamp))
-    app.add_handler(CommandHandler("pdf_grayscale",     cmd_pdf_grayscale))
-    app.add_handler(CommandHandler("pdf_extract_imgs",  cmd_pdf_extract_imgs))
-    app.add_handler(CommandHandler("pdf_remove_meta",   cmd_pdf_remove_meta))
-    app.add_handler(CommandHandler("pdf_word_count",    cmd_pdf_word_count))
-    app.add_handler(CommandHandler("pdf_header",        cmd_pdf_header))
-    app.add_handler(CommandHandler("pdf_bookmark",      cmd_pdf_bookmark))
+    for name, func in [
+        ("pdf_stamp", cmd_pdf_stamp), ("pdf_grayscale", cmd_pdf_grayscale),
+        ("pdf_extract_imgs", cmd_pdf_extract_imgs), ("pdf_remove_meta", cmd_pdf_remove_meta),
+        ("pdf_word_count", cmd_pdf_word_count), ("pdf_header", cmd_pdf_header),
+        ("pdf_bookmark", cmd_pdf_bookmark),
+    ]:
+        cmd(name, func)
 
-    # v5 Image
-    app.add_handler(CommandHandler("img_compress",      cmd_img_compress))
-    app.add_handler(CommandHandler("img_resize",        cmd_img_resize))
-    app.add_handler(CommandHandler("img_crop",          cmd_img_crop))
-    app.add_handler(CommandHandler("img_filter",        cmd_img_filter))
-    app.add_handler(CommandHandler("img_text",          cmd_img_text))
-    app.add_handler(CommandHandler("img2jpg",           cmd_img2jpg))
-    app.add_handler(CommandHandler("img2png",           cmd_img2png))
-    app.add_handler(CommandHandler("img_bgremove",      cmd_img_bgremove))
+    # Image (v5 + v6)
+    for name, func in [
+        ("img_compress", cmd_img_compress), ("img_resize", cmd_img_resize),
+        ("img_crop", cmd_img_crop), ("img_filter", cmd_img_filter),
+        ("img_text", cmd_img_text), ("img2jpg", cmd_img2jpg), ("img2png", cmd_img2png),
+        ("img_bgremove", cmd_img_bgremove), ("img_collage", cmd_img_collage),
+        ("img_meme", cmd_img_meme), ("img_sticker", cmd_img_sticker),
+        ("img_ascii", cmd_img_ascii), ("img_flip", cmd_img_flip),
+        ("img_border", cmd_img_border), ("img_round", cmd_img_round),
+        ("img_exif", cmd_img_exif), ("img_remove_exif", cmd_img_remove_exif),
+        ("img_enhance", cmd_img_enhance),
+    ]:
+        cmd(name, func)
 
-    # v6 Image
-    app.add_handler(CommandHandler("img_collage",       cmd_img_collage))
-    app.add_handler(CommandHandler("img_meme",          cmd_img_meme))
-    app.add_handler(CommandHandler("img_sticker",       cmd_img_sticker))
-    app.add_handler(CommandHandler("img_ascii",         cmd_img_ascii))
-    app.add_handler(CommandHandler("img_flip",          cmd_img_flip))
-    app.add_handler(CommandHandler("img_border",        cmd_img_border))
-    app.add_handler(CommandHandler("img_round",         cmd_img_round))
-    app.add_handler(CommandHandler("img_exif",          cmd_img_exif))
-    app.add_handler(CommandHandler("img_remove_exif",   cmd_img_remove_exif))
-    app.add_handler(CommandHandler("img_enhance",       cmd_img_enhance))
+    # Doc Convert
+    for name, func in [
+        ("csv2pdf", cmd_csv2pdf), ("txt2pdf", cmd_txt2pdf), ("html2pdf", cmd_html2pdf),
+        ("json2pdf", cmd_json2pdf), ("doc2pdf", cmd_doc2pdf),
+        ("pdf2epub", cmd_pdf2epub), ("epub2pdf", cmd_epub2pdf),
+    ]:
+        cmd(name, func)
 
-    # v5 Doc Convert
-    app.add_handler(CommandHandler("csv2pdf",           cmd_csv2pdf))
-    app.add_handler(CommandHandler("txt2pdf",           cmd_txt2pdf))
-    app.add_handler(CommandHandler("html2pdf",          cmd_html2pdf))
-    app.add_handler(CommandHandler("json2pdf",          cmd_json2pdf))
-    app.add_handler(CommandHandler("doc2pdf",           cmd_doc2pdf))
-    app.add_handler(CommandHandler("pdf2epub",          cmd_pdf2epub))
-    app.add_handler(CommandHandler("epub2pdf",          cmd_epub2pdf))
+    # Security & Creative
+    for name, func in [
+        ("hash", cmd_hash), ("steganography", cmd_steganography), ("pdf_sign", cmd_pdf_sign),
+        ("poster", cmd_poster), ("calendar_pdf", cmd_calendar_pdf), ("invoice", cmd_invoice),
+        ("resume", cmd_resume), ("certificate", cmd_certificate),
+        ("quote_card", cmd_quote_card), ("birthday_card", cmd_birthday_card),
+        ("business_card", cmd_business_card), ("flyer", cmd_flyer), ("timetable", cmd_timetable),
+    ]:
+        cmd(name, func)
 
-    # v5 Security
-    app.add_handler(CommandHandler("hash",              cmd_hash))
-    app.add_handler(CommandHandler("steganography",     cmd_steganography))
-    app.add_handler(CommandHandler("pdf_sign",          cmd_pdf_sign))
+    # Utilities & UX
+    for name, func in [
+        ("zip", cmd_zip), ("unzip", cmd_unzip), ("fileinfo", cmd_fileinfo),
+        ("qrcode_scan", cmd_qrcode_scan), ("barcode", cmd_barcode),
+        ("remind", cmd_remind), ("notes", cmd_notes), ("history", cmd_history),
+    ]:
+        cmd(name, func)
 
-    # v5 Creative
-    app.add_handler(CommandHandler("poster",            cmd_poster))
-    app.add_handler(CommandHandler("calendar_pdf",      cmd_calendar_pdf))
-    app.add_handler(CommandHandler("invoice",           cmd_invoice))
-    app.add_handler(CommandHandler("resume",            cmd_resume))
-    app.add_handler(CommandHandler("certificate",       cmd_certificate))
-
-    # v6 Creative
-    app.add_handler(CommandHandler("quote_card",        cmd_quote_card))
-    app.add_handler(CommandHandler("birthday_card",     cmd_birthday_card))
-    app.add_handler(CommandHandler("business_card",     cmd_business_card))
-    app.add_handler(CommandHandler("flyer",             cmd_flyer))
-    app.add_handler(CommandHandler("timetable",         cmd_timetable))
-
-    # v5 Utility
-    app.add_handler(CommandHandler("zip",               cmd_zip))
-    app.add_handler(CommandHandler("unzip",             cmd_unzip))
-    app.add_handler(CommandHandler("fileinfo",          cmd_fileinfo))
-    app.add_handler(CommandHandler("qrcode_scan",       cmd_qrcode_scan))
-    app.add_handler(CommandHandler("barcode",           cmd_barcode))
-
-    # v5/v6 UX
-    app.add_handler(CommandHandler("remind",            cmd_remind))
-    app.add_handler(CommandHandler("notes",             cmd_notes))
-    app.add_handler(CommandHandler("history",           cmd_history))
-
-    # Owner
-    app.add_handler(CommandHandler("givepremium",       grant_premium_cmd))
-    app.add_handler(CommandHandler("broadcast",         broadcast_cmd))
-    app.add_handler(CommandHandler("stats",             stats_cmd))
+    # Admin
+    cmd("givepremium", grant_premium_cmd)
+    cmd("broadcast",   broadcast_cmd)
+    cmd("stats",       stats_cmd)
 
     # Callbacks
     app.add_handler(CallbackQueryHandler(buy_plan_callback,       pattern="^buy_"))
     app.add_handler(CallbackQueryHandler(pay_screenshot_callback, pattern="^pay_ss_"))
     app.add_handler(CallbackQueryHandler(unified_callback_handler))
 
-    # Messages
+    # Messages — private
     app.add_handler(MessageHandler(
-        (filters.Document.ALL | filters.PHOTO | filters.TEXT)
-        & ~filters.COMMAND
-        & filters.ChatType.PRIVATE,
+        (filters.Document.ALL | filters.PHOTO | filters.TEXT) &
+        ~filters.COMMAND & filters.ChatType.PRIVATE,
         unified_message_handler,
     ))
+    # Messages — groups
     app.add_handler(MessageHandler(
         filters.ChatType.GROUPS & ~filters.COMMAND,
         handle_group_reaction,
@@ -551,7 +555,7 @@ def build_app() -> Application:
 # ── Web server ────────────────────────────────────────────────────────────────
 
 async def health(request):
-    return web.Response(text="Nexora PDF Doctor v6.0 — Running!", status=200)
+    return web.Response(text="Nexora PDF Doctor v7.0 — Online!", status=200)
 
 
 async def run_web_server(bot_app):
@@ -563,7 +567,7 @@ async def run_web_server(bot_app):
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    logger.info(f"Web server on port {PORT}")
+    logger.info(f"🌐 Web server on port {PORT}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -572,39 +576,33 @@ async def main():
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN not set!")
         return
-
     try:
         from utils.font_loader import download_fonts
         download_fonts()
     except Exception as e:
-        logger.warning(f"Font issue: {e}")
+        logger.warning(f"Fonts: {e}")
 
     tg_app = build_app()
-
     async with tg_app:
         try:
             await tg_app.bot.set_my_commands(BOT_COMMANDS)
-            logger.info("Bot commands set OK")
         except Exception as e:
             logger.warning(f"Commands: {e}")
 
     await run_web_server(tg_app)
+    logger.info("🚀 Starting Nexora PDF Doctor Bot v7.0...")
 
-    logger.info("Starting Nexora PDF Doctor Bot v6.0...")
     async with tg_app:
         await tg_app.start()
         asyncio.create_task(reminder_scheduler(tg_app.bot))
-        logger.info("Reminder scheduler started")
+        logger.info("✅ Nexora PDF Doctor v7.0 is LIVE!")
         await tg_app.updater.start_polling(
             drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES,
-            timeout=10,
-            read_timeout=15,
-            write_timeout=15,
-            connect_timeout=15,
+            timeout=10, read_timeout=15,
+            write_timeout=15, connect_timeout=15,
             pool_timeout=15,
         )
-        logger.info("✅ Nexora PDF Doctor v6.0 is LIVE!")
         await asyncio.Event().wait()
 
 

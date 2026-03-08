@@ -630,3 +630,262 @@ async def get_referral_link_text(user_id: int, bot_username: str) -> str:
         f"🎯 {remaining} more → <b>+{REFERRAL_BONUS_DAYS} days Basic FREE!</b>\n\n"
         f"💡 Share this link and earn rewards!"
     )
+
+
+# ── v7: Coin System ───────────────────────────────────────────────────────────
+
+async def _init_coins_tables():
+    if _mongo_db:
+        return
+    with _get_conn() as conn:
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS coins (
+            user_id   INTEGER PRIMARY KEY,
+            balance   INTEGER DEFAULT 0,
+            total_earned INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS coin_log (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER,
+            amount     INTEGER,
+            reason     TEXT,
+            created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS promo_uses (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER,
+            code       TEXT,
+            created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS trials (
+            user_id    INTEGER PRIMARY KEY,
+            expires_at TEXT,
+            used       INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS achievements (
+            user_id    INTEGER,
+            badge_id   TEXT,
+            earned_at  TEXT,
+            PRIMARY KEY (user_id, badge_id)
+        );
+        """)
+
+asyncio.get_event_loop().run_until_complete(_init_coins_tables()) if not _mongo_db else None
+
+
+async def get_coins(user_id: int) -> int:
+    if _mongo_db:
+        doc = await _mongo_db.coins.find_one({"user_id": user_id})
+        return doc["balance"] if doc else 0
+    with _get_conn() as conn:
+        row = conn.execute("SELECT balance FROM coins WHERE user_id=?", (user_id,)).fetchone()
+        return row["balance"] if row else 0
+
+
+async def add_coins(user_id: int, amount: int, reason: str = "") -> int:
+    """Add coins, return new balance."""
+    if _mongo_db:
+        await _mongo_db.coins.update_one(
+            {"user_id": user_id},
+            {"$inc": {"balance": amount, "total_earned": max(0, amount)}},
+            upsert=True
+        )
+        await _mongo_db.coin_log.insert_one(
+            {"user_id": user_id, "amount": amount, "reason": reason, "created_at": _now()}
+        )
+        doc = await _mongo_db.coins.find_one({"user_id": user_id})
+        return doc["balance"]
+    with _get_conn() as conn:
+        conn.execute(
+            "INSERT INTO coins(user_id,balance,total_earned) VALUES(?,?,?) "
+            "ON CONFLICT(user_id) DO UPDATE SET balance=balance+?, total_earned=total_earned+?",
+            (user_id, amount, max(0, amount), amount, max(0, amount))
+        )
+        conn.execute(
+            "INSERT INTO coin_log(user_id,amount,reason,created_at) VALUES(?,?,?,?)",
+            (user_id, amount, reason, _now())
+        )
+        row = conn.execute("SELECT balance FROM coins WHERE user_id=?", (user_id,)).fetchone()
+        return row["balance"] if row else 0
+
+
+async def spend_coins(user_id: int, amount: int, reason: str = "") -> bool:
+    """Spend coins. Returns False if insufficient balance."""
+    balance = await get_coins(user_id)
+    if balance < amount:
+        return False
+    await add_coins(user_id, -amount, reason)
+    return True
+
+
+async def get_coin_log(user_id: int, limit: int = 10) -> list:
+    if _mongo_db:
+        return await _mongo_db.coin_log.find({"user_id": user_id}).sort("created_at", -1).to_list(limit)
+    with _get_conn() as conn:
+        rows = conn.execute(
+            "SELECT amount, reason, created_at FROM coin_log WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# ── v7: Promo Codes ───────────────────────────────────────────────────────────
+
+async def redeem_promo(user_id: int, code: str) -> dict:
+    """Returns {ok, message, type, value} dict."""
+    from config import PROMO_CODES
+    code = code.upper().strip()
+    if code not in PROMO_CODES:
+        return {"ok": False, "message": "❌ Invalid promo code!"}
+    promo = PROMO_CODES[code]
+    # Check if user already used
+    if _mongo_db:
+        existing = await _mongo_db.promo_uses.find_one({"user_id": user_id, "code": code})
+        count    = await _mongo_db.promo_uses.count_documents({"code": code})
+    else:
+        with _get_conn() as conn:
+            existing = conn.execute(
+                "SELECT id FROM promo_uses WHERE user_id=? AND code=?", (user_id, code)
+            ).fetchone()
+            count_row = conn.execute(
+                "SELECT COUNT(*) FROM promo_uses WHERE code=?", (code,)
+            ).fetchone()
+            count = count_row[0] if count_row else 0
+    if existing:
+        return {"ok": False, "message": "⚠️ You already used this code!"}
+    if count >= promo.get("max_uses", 9999):
+        return {"ok": False, "message": "⚠️ This promo code has expired!"}
+    # Record use
+    if _mongo_db:
+        await _mongo_db.promo_uses.insert_one({"user_id": user_id, "code": code, "created_at": _now()})
+    else:
+        with _get_conn() as conn:
+            conn.execute(
+                "INSERT INTO promo_uses(user_id,code,created_at) VALUES(?,?,?)",
+                (user_id, code, _now())
+            )
+    return {"ok": True, "type": promo["type"], "value": promo["value"],
+            "days": promo.get("days", 0), "message": "✅ Promo redeemed!"}
+
+
+# ── v7: Trial System ─────────────────────────────────────────────────────────
+
+async def activate_trial(user_id: int) -> dict:
+    """Activate free trial. Returns {ok, message, expires_at}."""
+    from config import TRIAL_DURATION_DAYS, TRIAL_PLAN
+    if _mongo_db:
+        existing = await _mongo_db.trials.find_one({"user_id": user_id})
+    else:
+        with _get_conn() as conn:
+            existing = conn.execute("SELECT used FROM trials WHERE user_id=?", (user_id,)).fetchone()
+    if existing:
+        return {"ok": False, "message": "⚠️ You already used your free trial!"}
+    # Check current plan
+    plan = await get_plan(user_id)
+    if plan != "free":
+        return {"ok": False, "message": "⚠️ Trial only available for Free users!"}
+    expires = (datetime.datetime.now() + datetime.timedelta(days=TRIAL_DURATION_DAYS)).isoformat()
+    if _mongo_db:
+        await _mongo_db.trials.insert_one({"user_id": user_id, "expires_at": expires, "used": 1})
+        await _mongo_db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {"plan": TRIAL_PLAN, "trial_expires": expires}}
+        )
+    else:
+        with _get_conn() as conn:
+            conn.execute(
+                "INSERT INTO trials(user_id,expires_at,used) VALUES(?,?,1)", (user_id, expires)
+            )
+            conn.execute(
+                "UPDATE users SET plan=?, premium_until=? WHERE user_id=?",
+                (TRIAL_PLAN, expires, user_id)
+            )
+    return {"ok": True, "message": f"🎉 Trial activated!", "expires_at": expires}
+
+
+async def check_trial_expiry(user_id: int):
+    """Call on each message — downgrade if trial expired."""
+    if _mongo_db:
+        trial = await _mongo_db.trials.find_one({"user_id": user_id, "used": 1})
+        if trial:
+            if datetime.datetime.now().isoformat() > trial["expires_at"]:
+                user = await _mongo_db.users.find_one({"user_id": user_id})
+                if user and user.get("plan") == "basic" and user.get("trial_expires"):
+                    await _mongo_db.users.update_one(
+                        {"user_id": user_id}, {"$set": {"plan": "free", "trial_expires": None}}
+                    )
+    else:
+        with _get_conn() as conn:
+            trial = conn.execute(
+                "SELECT expires_at FROM trials WHERE user_id=? AND used=1", (user_id,)
+            ).fetchone()
+            if trial and datetime.datetime.now().isoformat() > trial["expires_at"]:
+                user = conn.execute(
+                    "SELECT plan FROM users WHERE user_id=?", (user_id,)
+                ).fetchone()
+                if user and user["plan"] == "basic":
+                    conn.execute("UPDATE users SET plan='free' WHERE user_id=?", (user_id,))
+
+
+# ── v7: Achievements ─────────────────────────────────────────────────────────
+
+async def check_and_award_achievements(user_id: int) -> list:
+    """Check all achievements, award new ones. Returns list of newly earned badges."""
+    from config import ACHIEVEMENTS
+    new_badges = []
+    # Get user stats
+    total_ops = 0
+    streak    = 0
+    refs      = 0
+    if _mongo_db:
+        doc = await _mongo_db.users.find_one({"user_id": user_id}) or {}
+        total_ops = doc.get("total_ops", 0)
+        s_doc     = await _mongo_db.streaks.find_one({"user_id": user_id}) or {}
+        streak    = s_doc.get("streak", 0)
+        refs      = await _mongo_db.users.count_documents({"referred_by": user_id})
+        earned    = {d["badge_id"] for d in await _mongo_db.achievements.find({"user_id": user_id}).to_list(None)}
+    else:
+        with _get_conn() as conn:
+            u_row = conn.execute("SELECT total_ops FROM users WHERE user_id=?", (user_id,)).fetchone()
+            total_ops = (u_row["total_ops"] if u_row and "total_ops" in u_row.keys() else 0) or 0
+            s_row = conn.execute("SELECT streak FROM streaks WHERE user_id=?", (user_id,)).fetchone()
+            streak = s_row["streak"] if s_row else 0
+            r_row = conn.execute("SELECT COUNT(*) FROM referrals WHERE referrer_id=?", (user_id,)).fetchone()
+            refs  = r_row[0] if r_row else 0
+            e_rows = conn.execute("SELECT badge_id FROM achievements WHERE user_id=?", (user_id,)).fetchall()
+            earned = {r["badge_id"] for r in e_rows}
+
+    for badge_id, badge in ACHIEVEMENTS.items():
+        if badge_id in earned:
+            continue
+        award = False
+        if "ops"    in badge and total_ops >= badge["ops"]:    award = True
+        if "streak" in badge and streak    >= badge["streak"]: award = True
+        if "refs"   in badge and refs      >= badge["refs"]:   award = True
+        if award:
+            if _mongo_db:
+                await _mongo_db.achievements.insert_one(
+                    {"user_id": user_id, "badge_id": badge_id, "earned_at": _now()}
+                )
+            else:
+                with _get_conn() as conn:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO achievements(user_id,badge_id,earned_at) VALUES(?,?,?)",
+                        (user_id, badge_id, _now())
+                    )
+            new_badges.append(badge)
+    return new_badges
+
+
+async def get_achievements(user_id: int) -> list:
+    from config import ACHIEVEMENTS
+    if _mongo_db:
+        earned = {d["badge_id"] for d in await _mongo_db.achievements.find({"user_id": user_id}).to_list(None)}
+    else:
+        with _get_conn() as conn:
+            rows   = conn.execute("SELECT badge_id FROM achievements WHERE user_id=?", (user_id,)).fetchall()
+            earned = {r["badge_id"] for r in rows}
+    result = []
+    for bid, badge in ACHIEVEMENTS.items():
+        result.append({**badge, "id": bid, "earned": bid in earned})
+    return result
