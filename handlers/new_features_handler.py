@@ -1921,3 +1921,1165 @@ async def handle_new_callbacks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -
         return True
 
     return False
+
+
+# =============================================================================
+# v6 NEW COMMAND ENTRY POINTS
+# =============================================================================
+
+async def cmd_pdf_stamp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "pdf_stamp"):
+        return
+    from utils.keyboards import stamp_menu
+    await update.effective_message.reply_text(
+        "🖊️ <b>PDF Stamp</b>\n\nChoose a stamp to add to all pages:",
+        parse_mode="HTML", reply_markup=stamp_menu()
+    )
+    ctx.user_data["state"] = "pdf_stamp_wait"
+
+
+async def cmd_pdf_grayscale(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "pdf_grayscale"):
+        return
+    ctx.user_data["state"] = "pdf_grayscale"
+    await update.effective_message.reply_text(
+        "⬛ <b>PDF Grayscale</b>\n\nConvert all pages to black & white!\nSend your PDF:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_pdf_extract_imgs(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "pdf_extract_imgs"):
+        return
+    ctx.user_data["state"] = "pdf_extract_imgs"
+    await update.effective_message.reply_text(
+        "🖼️ <b>Extract Images from PDF</b>\n\nAll images will be packed into a ZIP!\nSend your PDF:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_pdf_remove_meta(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "pdf_remove_meta"):
+        return
+    ctx.user_data["state"] = "pdf_remove_meta"
+    await update.effective_message.reply_text(
+        "🗑️ <b>Strip PDF Metadata</b>\n\nRemoves author, title, GPS, creation dates etc.\nSend your PDF:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_pdf_word_count(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "pdf_word_count"):
+        return
+    ctx.user_data["state"] = "pdf_word_count"
+    await update.effective_message.reply_text(
+        "📊 <b>PDF Word Count</b>\n\nGet detailed statistics — words, chars, lines, pages!\nSend your PDF:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_pdf_header(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "pdf_header"):
+        return
+    ctx.user_data["state"] = "pdf_header_pdf"
+    await update.effective_message.reply_text(
+        "🔢 <b>Add Header to PDF</b>\n\nStep 1: Send your PDF:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_pdf_bookmark(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "pdf_bookmark"):
+        return
+    ctx.user_data["state"] = "pdf_bookmark"
+    await update.effective_message.reply_text(
+        "🔖 <b>Extract Bookmarks / TOC</b>\n\nSend a PDF to see its Table of Contents!",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_img_collage(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "img_collage"):
+        return
+    ctx.user_data["state"]        = "collage_collect"
+    ctx.user_data["collage_imgs"] = []
+    await update.effective_message.reply_text(
+        "🖼️ <b>Image Collage</b>\n\n"
+        "Send images one by one (max 12).\n"
+        "Type /done when finished!",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_img_meme(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "img_meme"):
+        return
+    ctx.user_data["state"] = "meme_img"
+    await update.effective_message.reply_text(
+        "😂 <b>Meme Generator</b>\n\nStep 1: Send the image!",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_img_sticker(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "img_sticker"):
+        return
+    ctx.user_data["state"] = "img_sticker"
+    await update.effective_message.reply_text(
+        "🎭 <b>Telegram Sticker Maker</b>\n\n"
+        "Converts your image to 512×512 WebP sticker format!\n"
+        "Send an image:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_img_ascii(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "img_ascii"):
+        return
+    ctx.user_data["state"] = "img_ascii"
+    await update.effective_message.reply_text(
+        "🔤 <b>ASCII Art Generator</b>\n\nConverts image to ASCII art text!\nSend an image:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_img_flip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "img_flip"):
+        return
+    from utils.keyboards import img_flip_menu
+    await update.effective_message.reply_text(
+        "🔄 <b>Flip Image</b>\n\nFirst choose direction, then send image:",
+        parse_mode="HTML", reply_markup=img_flip_menu()
+    )
+
+
+async def cmd_img_border(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "img_border"):
+        return
+    from utils.keyboards import img_border_menu
+    await update.effective_message.reply_text(
+        "🖼️ <b>Add Border</b>\n\nChoose border color:",
+        parse_mode="HTML", reply_markup=img_border_menu()
+    )
+
+
+async def cmd_img_round(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "img_round"):
+        return
+    ctx.user_data["state"] = "img_round"
+    await update.effective_message.reply_text(
+        "⭕ <b>Rounded Corners</b>\n\nAdds smooth rounded corners to your image!\nSend an image:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_img_exif(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "img_exif"):
+        return
+    ctx.user_data["state"] = "img_exif"
+    await update.effective_message.reply_text(
+        "📷 <b>EXIF Data Viewer</b>\n\nSend a photo to see camera, GPS, settings info!",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_img_remove_exif(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "img_remove_exif"):
+        return
+    ctx.user_data["state"] = "img_remove_exif"
+    await update.effective_message.reply_text(
+        "🧹 <b>Strip EXIF (Privacy)</b>\n\n"
+        "Removes GPS location, camera model, date etc. from photo!\n"
+        "Send an image:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_img_enhance(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "img_enhance"):
+        return
+    ctx.user_data["state"] = "img_enhance"
+    await update.effective_message.reply_text(
+        "✨ <b>Auto Enhance</b>\n\nAuto-improves brightness, contrast, sharpness & colors!\nSend an image:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_quote_card(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "quote_card"):
+        return
+    from utils.keyboards import quote_theme_menu
+    await update.effective_message.reply_text(
+        "💬 <b>Quote Card Generator</b>\n\nBeautiful 1080×1080 quote images!\n\nChoose a theme:",
+        parse_mode="HTML", reply_markup=quote_theme_menu()
+    )
+
+
+async def cmd_birthday_card(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "birthday_card"):
+        return
+    ctx.user_data["state"] = "bday_name"
+    await update.effective_message.reply_text(
+        "🎂 <b>Birthday Card</b>\n\nEnter the recipient's name:",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_business_card(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "business_card"):
+        return
+    from utils.keyboards import bcard_theme_menu
+    ctx.user_data["bcard_data"] = {}
+    await update.effective_message.reply_text(
+        "💼 <b>Business Card Maker</b>\n\nChoose a theme:",
+        parse_mode="HTML", reply_markup=bcard_theme_menu()
+    )
+
+
+async def cmd_flyer(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "flyer"):
+        return
+    from utils.keyboards import flyer_theme_menu
+    await update.effective_message.reply_text(
+        "📢 <b>Flyer Generator</b>\n\nChoose a theme:",
+        parse_mode="HTML", reply_markup=flyer_theme_menu()
+    )
+
+
+async def cmd_timetable(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _check_limit(update, ctx, "timetable"):
+        return
+    ctx.user_data["state"]     = "timetable_title"
+    ctx.user_data["tt_schedule"] = {}
+    await update.effective_message.reply_text(
+        "🗓️ <b>Timetable Generator</b>\n\n"
+        "Step 1: Enter the timetable title:\nExample: <code>My Class Schedule</code>",
+        parse_mode="HTML", reply_markup=cancel_btn()
+    )
+
+
+async def cmd_feedback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    from utils.keyboards import feedback_menu
+    await update.effective_message.reply_text(
+        "⭐ <b>Rate Nexora Bot</b>\n\nHow would you rate your experience?\n\n"
+        "Your feedback helps us improve! 🙏",
+        parse_mode="HTML", reply_markup=feedback_menu()
+    )
+
+
+async def cmd_referral(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    from database import get_referral_link_text
+    bot  = update.get_bot()
+    info = await bot.get_me()
+    text = await get_referral_link_text(update.effective_user.id, info.username)
+    from utils.keyboards import back_btn
+    await update.effective_message.reply_text(text, parse_mode="HTML", reply_markup=back_btn())
+
+
+async def cmd_streak(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    from database import get_streak
+    from utils.pdf_utils import get_plan_badge
+    from database import get_plan
+    user_id = update.effective_user.id
+    s       = await get_streak(user_id)
+    plan    = await get_plan(user_id)
+    badge   = get_plan_badge(plan)
+    streak  = s["streak"]
+    best    = s["best"]
+    # Milestone messages
+    if streak >= 30:
+        fire = "🌟🌟🌟"
+    elif streak >= 14:
+        fire = "🏆🔥"
+    elif streak >= 7:
+        fire = "💎🔥"
+    elif streak >= 3:
+        fire = "🔥🔥"
+    else:
+        fire = "🔥"
+    await update.effective_message.reply_text(
+        f"{fire} <b>Your Streak</b>\n\n"
+        f"🔥 Current streak: <b>{streak} day(s)</b>\n"
+        f"🏆 Best streak: <b>{best} day(s)</b>\n"
+        f"📊 Plan: {badge}\n\n"
+        f"💡 Use the bot daily to keep your streak!\n"
+        f"🎁 Milestones: 3d, 7d, 14d, 30d → bonus ops!",
+        parse_mode="HTML", reply_markup=back_btn()
+    )
+
+
+# =============================================================================
+# v6 — EXTENDED handle_new_features STATE MACHINE
+# =============================================================================
+
+async def handle_new_features_v6(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
+    """v6 extension — returns True if handled."""
+    state   = ctx.user_data.get("state", "")
+    msg     = update.message
+    if not msg or not state:
+        return False
+    user_id = update.effective_user.id
+
+    # ── PDF GRAYSCALE ─────────────────────────────────────────────────────────
+    if state == "pdf_grayscale":
+        data = await _get_pdf(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Converting to grayscale...")
+        try:
+            result = pdf_utils.pdf_grayscale(data)
+            await _send_pdf(update, result, "grayscale.pdf",
+                            f"⬛ <b>Converted to grayscale!</b> {pdf_utils.file_size_str(data)} → {pdf_utils.file_size_str(result)}")
+            await increment_usage(user_id, "pdf_grayscale")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── PDF STAMP WAIT ────────────────────────────────────────────────────────
+    if state == "pdf_stamp_wait_pdf":
+        data = await _get_pdf(update)
+        if not data:
+            return True
+        stamp = ctx.user_data.get("stamp_text", "CONFIDENTIAL")
+        color = ctx.user_data.get("stamp_color", (180, 0, 0))
+        prog  = await msg.reply_text(f"⏳ Adding stamp: {stamp}...")
+        try:
+            result = pdf_utils.pdf_stamp(data, stamp, color)
+            await _send_pdf(update, result, "stamped.pdf",
+                            f"🖊️ <b>Stamp added!</b> All pages stamped with <b>{_esc(stamp)}</b>")
+            await increment_usage(user_id, "pdf_stamp")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        ctx.user_data.pop("stamp_text", None)
+        ctx.user_data.pop("stamp_color", None)
+        return True
+
+    # ── PDF STAMP CUSTOM TEXT ─────────────────────────────────────────────────
+    if state == "pdf_stamp_custom":
+        text_input = (msg.text or "").strip()
+        if not text_input:
+            await _err(update, "Enter stamp text.")
+            return True
+        ctx.user_data["stamp_text"]  = text_input.upper()
+        ctx.user_data["stamp_color"] = (80, 80, 80)
+        ctx.user_data["state"]       = "pdf_stamp_wait_pdf"
+        await msg.reply_text(
+            f"🖊️ Stamp: <b>{_esc(text_input.upper())}</b>\n\nNow send your PDF:",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    # ── PDF EXTRACT IMAGES ────────────────────────────────────────────────────
+    if state == "pdf_extract_imgs":
+        data = await _get_pdf(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Extracting images from PDF...")
+        try:
+            result = pdf_utils.pdf_extract_images(data)
+            await _send_file(update, result, "pdf_images.zip",
+                             "🖼️ <b>Images extracted!</b> All images packed in ZIP.")
+            await increment_usage(user_id, "pdf_extract_imgs")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── PDF REMOVE META ───────────────────────────────────────────────────────
+    if state == "pdf_remove_meta":
+        data = await _get_pdf(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Stripping metadata...")
+        try:
+            result = pdf_utils.pdf_remove_metadata(data)
+            await _send_pdf(update, result, "clean.pdf",
+                            "🗑️ <b>Metadata stripped!</b> PDF is now anonymous.")
+            await increment_usage(user_id, "pdf_remove_meta")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── PDF WORD COUNT ────────────────────────────────────────────────────────
+    if state == "pdf_word_count":
+        data = await _get_pdf(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Counting...")
+        try:
+            info = pdf_utils.pdf_word_count(data)
+            await update.effective_message.reply_text(
+                f"📊 <b>PDF Statistics</b>\n\n"
+                f"📄 Pages: <b>{info['pages']}</b>\n"
+                f"📝 Words: <b>{info['words']:,}</b>\n"
+                f"🔤 Characters: <b>{info['chars']:,}</b>\n"
+                f"↩️ Lines: <b>{info['lines']:,}</b>\n"
+                f"📈 Avg words/page: <b>{info['avg_words_per_page']}</b>",
+                parse_mode="HTML", reply_markup=back_btn()
+            )
+            await increment_usage(user_id, "pdf_word_count")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── PDF HEADER STEP 1 ─────────────────────────────────────────────────────
+    if state == "pdf_header_pdf":
+        data = await _get_pdf(update)
+        if not data:
+            return True
+        ctx.user_data["header_pdf"] = data
+        ctx.user_data["state"]      = "pdf_header_text"
+        await msg.reply_text("🔢 Now enter the header text:", reply_markup=cancel_btn())
+        return True
+
+    # ── PDF HEADER STEP 2 ─────────────────────────────────────────────────────
+    if state == "pdf_header_text":
+        header = (msg.text or "").strip()
+        if not header:
+            await _err(update, "Enter header text.")
+            return True
+        data = ctx.user_data.get("header_pdf")
+        prog = await msg.reply_text("⏳ Adding header...")
+        try:
+            result = pdf_utils.pdf_add_header(data, header)
+            await _send_pdf(update, result, "with_header.pdf",
+                            f"🔢 <b>Header added!</b> Text: <i>{_esc(header)}</i>")
+            await increment_usage(user_id, "pdf_header")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        ctx.user_data.pop("header_pdf", None)
+        return True
+
+    # ── PDF BOOKMARKS ─────────────────────────────────────────────────────────
+    if state == "pdf_bookmark":
+        data = await _get_pdf(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Reading bookmarks...")
+        try:
+            bmarks = pdf_utils.pdf_get_bookmarks(data)
+            if not bmarks:
+                await update.effective_message.reply_text(
+                    "🔖 <b>No bookmarks found</b> in this PDF.\n\n"
+                    "The PDF has no Table of Contents.",
+                    parse_mode="HTML", reply_markup=back_btn()
+                )
+            else:
+                text = "🔖 <b>Table of Contents</b>\n\n"
+                for b in bmarks[:40]:
+                    indent = "  " * (b["level"] - 1)
+                    text  += f"{indent}{'📌' if b['level']==1 else '◦'} {_esc(b['title'])} <i>(p.{b['page']})</i>\n"
+                await update.effective_message.reply_text(text, parse_mode="HTML", reply_markup=back_btn())
+            await increment_usage(user_id, "pdf_bookmark")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── IMAGE COLLAGE COLLECT ─────────────────────────────────────────────────
+    if state == "collage_collect":
+        if msg.photo or (msg.document and msg.document.mime_type and msg.document.mime_type.startswith("image/")):
+            if msg.photo:
+                f    = await msg.photo[-1].get_file()
+                data = bytes(await f.download_as_bytearray())
+            else:
+                f    = await msg.document.get_file()
+                data = bytes(await f.download_as_bytearray())
+            ctx.user_data.setdefault("collage_imgs", []).append(data)
+            count = len(ctx.user_data["collage_imgs"])
+            await msg.reply_text(f"🖼️ Image {count} added! Send more or /done")
+        elif msg.text and msg.text.strip() == "/done":
+            imgs = ctx.user_data.get("collage_imgs", [])
+            if len(imgs) < 2:
+                await _err(update, "Need at least 2 images!")
+                return True
+            cols = ctx.user_data.get("collage_cols", 2)
+            prog = await msg.reply_text("⏳ Creating collage...")
+            try:
+                result = pdf_utils.img_collage(imgs, cols)
+                await _send_photo(update, result, f"🖼️ <b>Collage ready!</b> {len(imgs)} images")
+                await increment_usage(user_id, "img_collage")
+            except Exception as e:
+                await _err(update, str(e))
+            finally:
+                try:
+                    await prog.delete()
+                except Exception:
+                    pass
+            ctx.user_data.pop("state", None)
+            ctx.user_data.pop("collage_imgs", None)
+            ctx.user_data.pop("collage_cols", None)
+        return True
+
+    # ── MEME: get image ───────────────────────────────────────────────────────
+    if state == "meme_img":
+        data = await _get_image(update)
+        if not data:
+            return True
+        ctx.user_data["meme_img"] = data
+        ctx.user_data["state"]    = "meme_top"
+        await msg.reply_text(
+            "😂 Image received!\nEnter <b>top text</b> (or type <code>skip</code>):",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    # ── MEME: top text ────────────────────────────────────────────────────────
+    if state == "meme_top":
+        ctx.user_data["meme_top"] = "" if (msg.text or "").strip().lower() == "skip" else (msg.text or "").strip()
+        ctx.user_data["state"]    = "meme_bottom"
+        await msg.reply_text(
+            "Enter <b>bottom text</b> (or type <code>skip</code>):",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    # ── MEME: bottom text → generate ─────────────────────────────────────────
+    if state == "meme_bottom":
+        bottom = "" if (msg.text or "").strip().lower() == "skip" else (msg.text or "").strip()
+        top    = ctx.user_data.get("meme_top", "")
+        data   = ctx.user_data.get("meme_img")
+        prog   = await msg.reply_text("⏳ Creating meme...")
+        try:
+            result = pdf_utils.img_meme(data, top, bottom)
+            await _send_photo(update, result, "😂 <b>Meme ready!</b>")
+            await increment_usage(user_id, "img_meme")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        ctx.user_data.pop("meme_img", None)
+        ctx.user_data.pop("meme_top", None)
+        return True
+
+    # ── STICKER ───────────────────────────────────────────────────────────────
+    if state == "img_sticker":
+        data = await _get_image(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Converting to sticker format...")
+        try:
+            result = pdf_utils.img_make_sticker(data)
+            await _send_file(update, result, "sticker.webp",
+                             "🎭 <b>Sticker ready!</b> 512×512 WebP\n💡 Use @Stickers bot to add to your pack!")
+            await increment_usage(user_id, "img_sticker")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── ASCII ART ─────────────────────────────────────────────────────────────
+    if state == "img_ascii":
+        data = await _get_image(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Converting to ASCII art...")
+        try:
+            ascii_text = pdf_utils.img_ascii_art(data, width=60)
+            # Truncate if too long
+            if len(ascii_text) > 3500:
+                ascii_text = ascii_text[:3500] + "\n..."
+            await update.effective_message.reply_text(
+                f"🔤 <b>ASCII Art:</b>\n\n<pre>{_esc(ascii_text)}</pre>",
+                parse_mode="HTML", reply_markup=back_btn()
+            )
+            await increment_usage(user_id, "img_ascii")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── IMAGE FLIP (after direction chosen via callback) ──────────────────────
+    if state == "img_flip_send":
+        data = await _get_image(update)
+        if not data:
+            return True
+        direction = ctx.user_data.get("flip_direction", "horizontal")
+        prog      = await msg.reply_text("⏳ Flipping image...")
+        try:
+            result = pdf_utils.img_flip(data, direction)
+            await _send_file(update, result, "flipped.png",
+                             f"🔄 <b>Flipped {direction}!</b>")
+            await increment_usage(user_id, "img_flip")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        ctx.user_data.pop("flip_direction", None)
+        return True
+
+    # ── IMAGE BORDER (after color chosen via callback) ────────────────────────
+    if state == "img_border_send":
+        data = await _get_image(update)
+        if not data:
+            return True
+        color = ctx.user_data.get("border_color", (255, 255, 255))
+        prog  = await msg.reply_text("⏳ Adding border...")
+        try:
+            result = pdf_utils.img_add_border(data, size=25, color=color)
+            await _send_file(update, result, "bordered.jpg",
+                             "🖼️ <b>Border added!</b>")
+            await increment_usage(user_id, "img_border")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        ctx.user_data.pop("border_color", None)
+        return True
+
+    # ── IMAGE ROUND CORNERS ───────────────────────────────────────────────────
+    if state == "img_round":
+        data = await _get_image(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Rounding corners...")
+        try:
+            result = pdf_utils.img_round_corners(data)
+            await _send_file(update, result, "rounded.png",
+                             "⭕ <b>Rounded corners applied!</b>")
+            await increment_usage(user_id, "img_round")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── IMAGE EXIF VIEW ───────────────────────────────────────────────────────
+    if state == "img_exif":
+        data = await _get_image(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Reading EXIF data...")
+        try:
+            exif = pdf_utils.img_get_exif(data)
+            if not exif:
+                await update.effective_message.reply_text(
+                    "📷 <b>No EXIF data found!</b>\n\nThis image has no metadata.",
+                    parse_mode="HTML", reply_markup=back_btn()
+                )
+            else:
+                lines = "\n".join(f"  <b>{_esc(k)}:</b> <code>{_esc(v)}</code>"
+                                  for k, v in list(exif.items())[:20])
+                await update.effective_message.reply_text(
+                    f"📷 <b>EXIF Data</b>\n\n{lines}",
+                    parse_mode="HTML", reply_markup=back_btn()
+                )
+            await increment_usage(user_id, "img_exif")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── REMOVE EXIF ───────────────────────────────────────────────────────────
+    if state == "img_remove_exif":
+        data = await _get_image(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Stripping EXIF data...")
+        try:
+            result = pdf_utils.img_remove_exif(data)
+            await _send_file(update, result, "clean_photo.jpg",
+                             "🧹 <b>EXIF stripped!</b> GPS, camera info removed.")
+            await increment_usage(user_id, "img_remove_exif")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── AUTO ENHANCE ──────────────────────────────────────────────────────────
+    if state == "img_enhance":
+        data = await _get_image(update)
+        if not data:
+            return True
+        prog = await msg.reply_text("⏳ Enhancing image...")
+        try:
+            result = pdf_utils.img_auto_enhance(data)
+            await _send_file(update, result, "enhanced.jpg",
+                             "✨ <b>Image enhanced!</b>")
+            await increment_usage(user_id, "img_enhance")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        return True
+
+    # ── QUOTE CARD (after theme chosen via callback) ──────────────────────────
+    if state == "quote_card_input":
+        text_input = (msg.text or "").strip()
+        theme      = ctx.user_data.get("quote_theme", "dark")
+        parts      = text_input.split("|")
+        quote      = parts[0].strip()
+        author     = parts[1].strip() if len(parts) > 1 else ""
+        if not quote:
+            await _err(update, "Enter a quote.")
+            return True
+        prog = await msg.reply_text("⏳ Creating quote card...")
+        try:
+            result = pdf_utils.create_quote_card(quote, author, theme)
+            await _send_photo(update, result, f"💬 <b>Quote card ready!</b>")
+            await increment_usage(user_id, "quote_card")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        ctx.user_data.pop("quote_theme", None)
+        return True
+
+    # ── BIRTHDAY CARD ─────────────────────────────────────────────────────────
+    if state == "bday_name":
+        ctx.user_data["bday_name"] = (msg.text or "").strip()
+        ctx.user_data["state"]     = "bday_msg"
+        await msg.reply_text(
+            "🎂 Enter a birthday message (or type <code>skip</code>):",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    if state == "bday_msg":
+        message = "" if (msg.text or "").strip().lower() == "skip" else (msg.text or "").strip()
+        name    = ctx.user_data.get("bday_name", "")
+        prog    = await msg.reply_text("⏳ Creating birthday card...")
+        try:
+            result = pdf_utils.create_birthday_card(name, message)
+            await _send_pdf(update, result, "birthday_card.pdf",
+                            f"🎂 <b>Birthday card for {_esc(name)}!</b>")
+            await increment_usage(user_id, "birthday_card")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        ctx.user_data.pop("bday_name", None)
+        return True
+
+    # ── BUSINESS CARD STEPS ───────────────────────────────────────────────────
+    if state == "bcard_name":
+        ctx.user_data["bcard_data"]["name"] = (msg.text or "").strip()
+        ctx.user_data["state"] = "bcard_title"
+        await msg.reply_text("💼 Your job title:", reply_markup=cancel_btn())
+        return True
+
+    if state == "bcard_title":
+        ctx.user_data["bcard_data"]["title"] = (msg.text or "").strip()
+        ctx.user_data["state"] = "bcard_company"
+        await msg.reply_text("💼 Company name (or skip):", reply_markup=cancel_btn())
+        return True
+
+    if state == "bcard_company":
+        t = (msg.text or "").strip()
+        ctx.user_data["bcard_data"]["company"] = "" if t.lower() == "skip" else t
+        ctx.user_data["state"] = "bcard_phone"
+        await msg.reply_text("📞 Phone number:", reply_markup=cancel_btn())
+        return True
+
+    if state == "bcard_phone":
+        ctx.user_data["bcard_data"]["phone"] = (msg.text or "").strip()
+        ctx.user_data["state"] = "bcard_email"
+        await msg.reply_text("✉️ Email address:", reply_markup=cancel_btn())
+        return True
+
+    if state == "bcard_email":
+        ctx.user_data["bcard_data"]["email"] = (msg.text or "").strip()
+        d     = ctx.user_data.get("bcard_data", {})
+        theme = ctx.user_data.get("bcard_theme", "minimal")
+        prog  = await msg.reply_text("⏳ Creating business card...")
+        try:
+            result = pdf_utils.create_business_card(
+                d.get("name",""), d.get("title",""), d.get("phone",""),
+                d.get("email",""), d.get("company",""), theme
+            )
+            await _send_pdf(update, result, "business_card.pdf",
+                            f"💼 <b>Business card ready for {_esc(d.get('name',''))}!</b>")
+            await increment_usage(user_id, "business_card")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        ctx.user_data.pop("bcard_data", None)
+        ctx.user_data.pop("bcard_theme", None)
+        return True
+
+    # ── FLYER STEPS ───────────────────────────────────────────────────────────
+    if state == "flyer_title":
+        ctx.user_data["flyer_data"] = {"title": (msg.text or "").strip()}
+        ctx.user_data["state"]      = "flyer_subtitle"
+        await msg.reply_text("📢 Enter subtitle / tagline:", reply_markup=cancel_btn())
+        return True
+
+    if state == "flyer_subtitle":
+        ctx.user_data["flyer_data"]["subtitle"] = (msg.text or "").strip()
+        ctx.user_data["state"]                  = "flyer_details"
+        await msg.reply_text("📢 Enter details/description:", reply_markup=cancel_btn())
+        return True
+
+    if state == "flyer_details":
+        ctx.user_data["flyer_data"]["details"] = (msg.text or "").strip()
+        ctx.user_data["state"]                 = "flyer_datetime"
+        await msg.reply_text(
+            "📢 Enter date & time (or type <code>skip</code>):",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    if state == "flyer_datetime":
+        t     = (msg.text or "").strip()
+        d     = ctx.user_data.get("flyer_data", {})
+        theme = ctx.user_data.get("flyer_theme", "event")
+        dt    = "" if t.lower() == "skip" else t
+        prog  = await msg.reply_text("⏳ Creating flyer...")
+        try:
+            result = pdf_utils.create_flyer(
+                d.get("title",""), d.get("subtitle",""),
+                d.get("details",""), dt, theme
+            )
+            await _send_pdf(update, result, "flyer.pdf", "📢 <b>Flyer ready!</b>")
+            await increment_usage(user_id, "flyer")
+        except Exception as e:
+            await _err(update, str(e))
+        finally:
+            try:
+                await prog.delete()
+            except Exception:
+                pass
+        ctx.user_data.pop("state", None)
+        ctx.user_data.pop("flyer_data", None)
+        ctx.user_data.pop("flyer_theme", None)
+        return True
+
+    # ── TIMETABLE STEPS ───────────────────────────────────────────────────────
+    if state == "timetable_title":
+        ctx.user_data["tt_title"] = (msg.text or "My Timetable").strip()
+        ctx.user_data["state"]    = "timetable_days"
+        await msg.reply_text(
+            "🗓️ Now enter schedule day by day.\n\n"
+            "Format: <code>Day: slot1, slot2, slot3</code>\n\n"
+            "Example:\n"
+            "<code>Monday: 9:00 Math, 10:00 Science, 11:00 English</code>\n\n"
+            "Send one day per message. Type <b>done</b> when finished.",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    if state == "timetable_days":
+        text_input = (msg.text or "").strip()
+        if text_input.lower() == "done":
+            schedule = ctx.user_data.get("tt_schedule", {})
+            title    = ctx.user_data.get("tt_title", "My Timetable")
+            if not schedule:
+                await _err(update, "Add at least one day!")
+                return True
+            prog = await msg.reply_text("⏳ Generating timetable...")
+            try:
+                result = pdf_utils.create_timetable(schedule, title)
+                await _send_pdf(update, result, "timetable.pdf",
+                                f"🗓️ <b>Timetable ready!</b> {len(schedule)} days")
+                await increment_usage(user_id, "timetable")
+            except Exception as e:
+                await _err(update, str(e))
+            finally:
+                try:
+                    await prog.delete()
+                except Exception:
+                    pass
+            ctx.user_data.pop("state", None)
+            ctx.user_data.pop("tt_schedule", None)
+            ctx.user_data.pop("tt_title", None)
+        else:
+            if ":" in text_input:
+                day, _, slots_str = text_input.partition(":")
+                day   = day.strip().title()
+                slots = [s.strip() for s in slots_str.split(",") if s.strip()]
+                if slots:
+                    ctx.user_data["tt_schedule"][day] = slots
+                    await msg.reply_text(
+                        f"✅ <b>{day}</b> added! ({len(slots)} slots)\nSend next day or type <b>done</b>.",
+                        parse_mode="HTML"
+                    )
+                else:
+                    await _err(update, "No slots found. Format: Monday: Math, Science")
+            else:
+                await _err(update, "Format: Day: slot1, slot2\nExample: Monday: Math, Science")
+        return True
+
+    # ── FEEDBACK RATING FOLLOW-UP ─────────────────────────────────────────────
+    if state == "feedback_msg":
+        fb_msg  = (msg.text or "").strip()
+        rating  = ctx.user_data.get("feedback_rating", 5)
+        from database import save_feedback
+        await save_feedback(user_id, rating, fb_msg)
+        stars = "⭐" * rating
+        await msg.reply_text(
+            f"{stars} <b>Thank you for your feedback!</b>\n\n"
+            f"Your rating: <b>{rating}/5</b>\n"
+            f"Message: <i>{_esc(fb_msg) if fb_msg else 'No message'}</i>",
+            parse_mode="HTML", reply_markup=back_btn()
+        )
+        ctx.user_data.pop("state", None)
+        ctx.user_data.pop("feedback_rating", None)
+        return True
+
+    return False
+
+
+# =============================================================================
+# v6 CALLBACK HANDLER EXTENSION
+# =============================================================================
+
+async def handle_new_callbacks_v6(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
+    """v6 callbacks — returns True if handled."""
+    q = update.callback_query
+    if not q:
+        return False
+    data    = q.data
+    user_id = q.from_user.id
+
+    # ── Stamp preset ──────────────────────────────────────────────────────────
+    if data.startswith("stamp_"):
+        await q.answer()
+        stamp_key = data[6:].replace("_", " ")
+        if data == "stamp_custom":
+            ctx.user_data["state"] = "pdf_stamp_custom"
+            await q.message.reply_text(
+                "✏️ Enter custom stamp text (will be UPPERCASE):",
+                reply_markup=cancel_btn()
+            )
+        else:
+            from config import STAMP_PRESETS
+            matched = next((s for s in STAMP_PRESETS if stamp_key in s[0]), None)
+            color   = matched[1] if matched else (80, 80, 80)
+            ctx.user_data["stamp_text"]  = stamp_key
+            ctx.user_data["stamp_color"] = color
+            ctx.user_data["state"]       = "pdf_stamp_wait_pdf"
+            await q.message.reply_text(
+                f"🖊️ Stamp: <b>{_esc(stamp_key)}</b>\nNow send your PDF:",
+                parse_mode="HTML", reply_markup=cancel_btn()
+            )
+        return True
+
+    # ── Quote card theme ──────────────────────────────────────────────────────
+    if data.startswith("quote_"):
+        await q.answer()
+        theme = data[6:]
+        ctx.user_data["quote_theme"] = theme
+        ctx.user_data["state"]       = "quote_card_input"
+        await q.message.reply_text(
+            f"💬 <b>Theme: {theme.title()}</b>\n\n"
+            "Enter your quote:\n"
+            "With author: <code>Your quote here | Author Name</code>",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    # ── Business card theme ───────────────────────────────────────────────────
+    if data.startswith("bcard_"):
+        await q.answer()
+        theme = data[6:]
+        ctx.user_data["bcard_theme"] = theme
+        ctx.user_data["state"]       = "bcard_name"
+        ctx.user_data.setdefault("bcard_data", {})
+        await q.message.reply_text(
+            f"💼 <b>Theme: {theme.title()}</b>\n\nStep 1: Your full name:",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    # ── Flyer theme ───────────────────────────────────────────────────────────
+    if data.startswith("flyer_"):
+        await q.answer()
+        theme = data[6:]
+        ctx.user_data["flyer_theme"] = theme
+        ctx.user_data["state"]       = "flyer_title"
+        await q.message.reply_text(
+            f"📢 <b>Theme: {theme.title()}</b>\n\nStep 1: Enter the main title:",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    # ── Flip direction ────────────────────────────────────────────────────────
+    if data in ("flip_horizontal", "flip_vertical"):
+        await q.answer()
+        ctx.user_data["flip_direction"] = data.split("_")[1]
+        ctx.user_data["state"]          = "img_flip_send"
+        await q.message.reply_text(
+            f"🔄 Direction: <b>{ctx.user_data['flip_direction']}</b>\nNow send an image:",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    # ── Border color ──────────────────────────────────────────────────────────
+    BORDER_COLORS = {
+        "white":  (255, 255, 255), "black":  (0,   0,   0),
+        "red":    (220, 50,  50),  "blue":   (50,  100, 220),
+        "yellow": (255, 220, 0),   "green":  (50,  180, 50),
+        "pink":   (255, 150, 200), "orange": (255, 130, 0),
+    }
+    if data.startswith("border_"):
+        await q.answer()
+        color_name = data[7:]
+        color      = BORDER_COLORS.get(color_name, (255, 255, 255))
+        ctx.user_data["border_color"] = color
+        ctx.user_data["state"]        = "img_border_send"
+        await q.message.reply_text(
+            f"🖼️ Border color: <b>{color_name.title()}</b>\nNow send an image:",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    # ── Collage columns ───────────────────────────────────────────────────────
+    if data.startswith("collage_"):
+        await q.answer()
+        try:
+            cols = int(data.split("_")[1])
+        except Exception:
+            cols = 2
+        ctx.user_data["collage_cols"] = cols
+        ctx.user_data["state"]        = "collage_collect"
+        ctx.user_data["collage_imgs"] = []
+        await q.message.reply_text(
+            f"🖼️ <b>{cols} columns</b>\nSend your images one by one, then /done",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    # ── Feedback rating ───────────────────────────────────────────────────────
+    if data.startswith("fb_"):
+        await q.answer()
+        try:
+            rating = int(data[3:])
+        except Exception:
+            rating = 5
+        ctx.user_data["feedback_rating"] = rating
+        ctx.user_data["state"]           = "feedback_msg"
+        stars = "⭐" * rating
+        await q.message.reply_text(
+            f"{stars} <b>Rating: {rating}/5</b>\n\n"
+            "Add a message (optional), or type <code>skip</code>:",
+            parse_mode="HTML", reply_markup=cancel_btn()
+        )
+        return True
+
+    # ── Menu shortcuts for v6 features ───────────────────────────────────────
+    v6_menu_map = {
+        "menu_pdf_stamp":        cmd_pdf_stamp,
+        "menu_pdf_grayscale":    cmd_pdf_grayscale,
+        "menu_pdf_extract_imgs": cmd_pdf_extract_imgs,
+        "menu_pdf_remove_meta":  cmd_pdf_remove_meta,
+        "menu_pdf_word_count":   cmd_pdf_word_count,
+        "menu_pdf_header":       cmd_pdf_header,
+        "menu_pdf_bookmark":     cmd_pdf_bookmark,
+        "menu_img_collage":      cmd_img_collage,
+        "menu_img_meme":         cmd_img_meme,
+        "menu_img_sticker":      cmd_img_sticker,
+        "menu_img_ascii":        cmd_img_ascii,
+        "menu_img_flip":         cmd_img_flip,
+        "menu_img_border":       cmd_img_border,
+        "menu_img_round":        cmd_img_round,
+        "menu_img_exif":         cmd_img_exif,
+        "menu_img_remove_exif":  cmd_img_remove_exif,
+        "menu_img_enhance":      cmd_img_enhance,
+        "menu_quote_card":       cmd_quote_card,
+        "menu_birthday_card":    cmd_birthday_card,
+        "menu_business_card":    cmd_business_card,
+        "menu_flyer":            cmd_flyer,
+        "menu_timetable":        cmd_timetable,
+        "menu_feedback":         cmd_feedback,
+        "menu_referral":         cmd_referral,
+        "menu_streak":           cmd_streak,
+    }
+    if data in v6_menu_map:
+        await q.answer()
+        await v6_menu_map[data](update, ctx)
+        return True
+
+    return False
