@@ -77,3 +77,41 @@ def get_font_path(font_key: str) -> str | None:
         if _dl(url, path): return path
     logger.warning(f"Font '{font_key}' unavailable — using Helvetica")
     return None
+
+def download_extra_fonts():
+    """Download v8 extra handwriting fonts."""
+    from config import EXTRA_FONT_URLS
+    FONTS_DIR = "fonts"
+    os.makedirs(FONTS_DIR, exist_ok=True)
+    ok = skip = fail = 0
+    for fname, url in EXTRA_FONT_URLS.items():
+        fpath = os.path.join(FONTS_DIR, fname)
+        if os.path.exists(fpath) and os.path.getsize(fpath) > 1000:
+            skip += 1; continue
+        logger.info(f"⬇️  Extra font: {fname}...")
+        if _dl(url, fpath):
+            ok += 1
+        else:
+            fail += 1
+    logger.info(f"🔤 Extra fonts: {ok} downloaded · {skip} cached · {fail} failed")
+
+def get_extra_font_path(font_key: str) -> str | None:
+    """Get path for extra v8 fonts."""
+    from config import EXTRA_FONTS, EXTRA_FONT_URLS
+    info = EXTRA_FONTS.get(font_key)
+    if not info: return None
+    path  = info["file"]
+    if os.path.exists(path) and os.path.getsize(path) > 1000:
+        return path
+    fname = os.path.basename(path)
+    url   = EXTRA_FONT_URLS.get(fname)
+    if url:
+        os.makedirs(FONTS_DIR, exist_ok=True)
+        if _dl(url, path): return path
+    return None
+
+def get_any_font_path(font_key: str) -> str | None:
+    """Check both original and extra fonts."""
+    path = get_font_path(font_key)
+    if path: return path
+    return get_extra_font_path(font_key)
