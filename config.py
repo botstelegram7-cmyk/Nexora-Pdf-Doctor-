@@ -38,7 +38,7 @@ BULK_MAX_FILES = {
     "basic": 10,
     "pro":   25,
 }
-BULK_QUEUE_TIMEOUT = 120  # seconds
+BULK_QUEUE_TIMEOUT = 120
 
 # ─── Broadcast Rate Limiting ─────────────────────
 BROADCAST_DELAY_SEC = 0.35
@@ -52,92 +52,160 @@ SCHEDULED_DELETION_OPTIONS = {
     "24h":  24 * 60 * 60,
 }
 
-# ─── Per-Feature Rate Limits (ops/day) ───────────
+# ─── Per-Feature Rate Limits ─────────────────────
 FEATURE_LIMITS = {
-    # PDF Tools
-    "compress":      {"free": 3,  "basic": 30, "pro": None},
-    "split":         {"free": 2,  "basic": 20, "pro": None},
-    "merge":         {"free": 2,  "basic": 20, "pro": None},
-    "lock":          {"free": 3,  "basic": 30, "pro": None},
-    "unlock":        {"free": 3,  "basic": 30, "pro": None},
-    "repair":        {"free": 2,  "basic": 15, "pro": None},
-    "pdf2txt":       {"free": 5,  "basic": 50, "pro": None},
-    "linearize":     {"free": 3,  "basic": 30, "pro": None},
-    "thumbnail":     {"free": 10, "basic": None,"pro": None},
-    "pdf_info":      {"free": 10, "basic": None,"pro": None},
-    "redact":        {"free": 2,  "basic": 20, "pro": None},
-    "impose":        {"free": 2,  "basic": 20, "pro": None},
-    "deskew":        {"free": 2,  "basic": 20, "pro": None},
-    "bulk":          {"free": 0,  "basic": 5,  "pro": None},
-    # Visual
-    "watermark":     {"free": 2,  "basic": 20, "pro": None},
-    "darkmode":      {"free": 2,  "basic": 20, "pro": None},
-    "bgchange":      {"free": 2,  "basic": 20, "pro": None},
-    "rotate":        {"free": 5,  "basic": 50, "pro": None},
-    "resize":        {"free": 3,  "basic": 30, "pro": None},
-    # Convert PDF
-    "pdf2img":       {"free": 2,  "basic": 15, "pro": None},
-    "img2pdf":       {"free": 3,  "basic": 20, "pro": None},
-    "excel":         {"free": 2,  "basic": 15, "pro": None},
-    "pdf2word":      {"free": 2,  "basic": 15, "pro": None},
-    "pdf2ppt":       {"free": 0,  "basic": 0,  "pro": None},
-    "pdf2epub":      {"free": 0,  "basic": 5,  "pro": None},
-    "doc2pdf":       {"free": 2,  "basic": 20, "pro": None},
-    "epub2pdf":      {"free": 2,  "basic": 20, "pro": None},
-    # Image Tools
-    "img_compress":  {"free": 5,  "basic": 50, "pro": None},
-    "img_resize":    {"free": 5,  "basic": 50, "pro": None},
-    "img_crop":      {"free": 5,  "basic": 50, "pro": None},
-    "img_filter":    {"free": 5,  "basic": 50, "pro": None},
-    "img_text":      {"free": 3,  "basic": 30, "pro": None},
-    "img2jpg":       {"free": 5,  "basic": None,"pro": None},
-    "img2png":       {"free": 5,  "basic": None,"pro": None},
-    "img_bgremove":  {"free": 0,  "basic": 5,  "pro": None},
-    # Document Convert
-    "csv2pdf":       {"free": 3,  "basic": 30, "pro": None},
-    "txt2pdf":       {"free": 5,  "basic": 50, "pro": None},
-    "html2pdf":      {"free": 2,  "basic": 20, "pro": None},
-    "json2pdf":      {"free": 3,  "basic": 30, "pro": None},
-    # Security & Privacy
-    "hash":          {"free": 20, "basic": None,"pro": None},
-    "steganography": {"free": 2,  "basic": 15, "pro": None},
-    "pdf_sign":      {"free": 2,  "basic": 20, "pro": None},
-    "pwd_crack":     {"free": 0,  "basic": 0,  "pro": 1},
-    # Creative
-    "poster":        {"free": 3,  "basic": 30, "pro": None},
-    "calendar_pdf":  {"free": 2,  "basic": 20, "pro": None},
-    "invoice":       {"free": 2,  "basic": 20, "pro": None},
-    "resume":        {"free": 1,  "basic": 10, "pro": None},
-    "certificate":   {"free": 1,  "basic": 10, "pro": None},
-    # Utility
-    "zip":           {"free": 3,  "basic": 30, "pro": None},
-    "unzip":         {"free": 3,  "basic": 30, "pro": None},
-    "fileinfo":      {"free": 20, "basic": None,"pro": None},
-    "qrcode_scan":   {"free": 10, "basic": None,"pro": None},
-    "barcode":       {"free": 10, "basic": None,"pro": None},
-    "remind":        {"free": 3,  "basic": 20, "pro": None},
-    "notes":         {"free": 5,  "basic": 50, "pro": None},
-    "history":       {"free": 5,  "basic": None,"pro": None},
-    # Original features
-    "handwrite":     {"free": 5,  "basic": 50, "pro": None},
-    "addtext":       {"free": 5,  "basic": 50, "pro": None},
-    "footer":        {"free": 5,  "basic": 50, "pro": None},
-    "pagenos":       {"free": 3,  "basic": 30, "pro": None},
-    "crop":          {"free": 5,  "basic": 50, "pro": None},
-    "qr":            {"free": 10, "basic": None,"pro": None},
-    "extract":       {"free": 3,  "basic": 30, "pro": None},
-    "delete_pages":  {"free": 2,  "basic": 20, "pro": None},
-    "reorder":       {"free": 3,  "basic": 30, "pro": None},
-    "reverse":       {"free": 5,  "basic": 50, "pro": None},
-    "pdf_compare":   {"free": 1,  "basic": 10, "pro": None},
-    "ocr":           {"free": 3,  "basic": 20, "pro": None},
-    "metadata":      {"free": 10, "basic": None,"pro": None},
-    "metadata_edit": {"free": 0,  "basic": 10, "pro": None},
+    "compress":         {"free": 3,  "basic": 30,   "pro": None},
+    "split":            {"free": 2,  "basic": 20,   "pro": None},
+    "merge":            {"free": 2,  "basic": 20,   "pro": None},
+    "lock":             {"free": 3,  "basic": 30,   "pro": None},
+    "unlock":           {"free": 3,  "basic": 30,   "pro": None},
+    "repair":           {"free": 2,  "basic": 15,   "pro": None},
+    "pdf2txt":          {"free": 5,  "basic": 50,   "pro": None},
+    "linearize":        {"free": 3,  "basic": 30,   "pro": None},
+    "thumbnail":        {"free": 10, "basic": None,  "pro": None},
+    "pdf_info":         {"free": 10, "basic": None,  "pro": None},
+    "redact":           {"free": 2,  "basic": 20,   "pro": None},
+    "impose":           {"free": 2,  "basic": 20,   "pro": None},
+    "deskew":           {"free": 2,  "basic": 20,   "pro": None},
+    "bulk":             {"free": 0,  "basic": 5,    "pro": None},
+    "pdf_stamp":        {"free": 3,  "basic": 30,   "pro": None},
+    "pdf_grayscale":    {"free": 5,  "basic": None,  "pro": None},
+    "pdf_extract_imgs": {"free": 2,  "basic": 20,   "pro": None},
+    "pdf_remove_meta":  {"free": 5,  "basic": None,  "pro": None},
+    "pdf_permissions":  {"free": 0,  "basic": 10,   "pro": None},
+    "pdf_bookmark":     {"free": 5,  "basic": None,  "pro": None},
+    "pdf_header":       {"free": 3,  "basic": 30,   "pro": None},
+    "pdf_word_count":   {"free": 20, "basic": None,  "pro": None},
+    "watermark":        {"free": 2,  "basic": 20,   "pro": None},
+    "darkmode":         {"free": 2,  "basic": 20,   "pro": None},
+    "bgchange":         {"free": 2,  "basic": 20,   "pro": None},
+    "rotate":           {"free": 5,  "basic": 50,   "pro": None},
+    "resize":           {"free": 3,  "basic": 30,   "pro": None},
+    "pdf2img":          {"free": 2,  "basic": 15,   "pro": None},
+    "img2pdf":          {"free": 3,  "basic": 20,   "pro": None},
+    "excel":            {"free": 2,  "basic": 15,   "pro": None},
+    "pdf2word":         {"free": 2,  "basic": 15,   "pro": None},
+    "pdf2ppt":          {"free": 0,  "basic": 0,    "pro": None},
+    "pdf2epub":         {"free": 0,  "basic": 5,    "pro": None},
+    "doc2pdf":          {"free": 2,  "basic": 20,   "pro": None},
+    "epub2pdf":         {"free": 2,  "basic": 20,   "pro": None},
+    "img_compress":     {"free": 5,  "basic": 50,   "pro": None},
+    "img_resize":       {"free": 5,  "basic": 50,   "pro": None},
+    "img_crop":         {"free": 5,  "basic": 50,   "pro": None},
+    "img_filter":       {"free": 5,  "basic": 50,   "pro": None},
+    "img_text":         {"free": 3,  "basic": 30,   "pro": None},
+    "img2jpg":          {"free": 5,  "basic": None,  "pro": None},
+    "img2png":          {"free": 5,  "basic": None,  "pro": None},
+    "img_bgremove":     {"free": 0,  "basic": 5,    "pro": None},
+    "img_collage":      {"free": 2,  "basic": 20,   "pro": None},
+    "img_meme":         {"free": 5,  "basic": 50,   "pro": None},
+    "img_sticker":      {"free": 5,  "basic": None,  "pro": None},
+    "img_ascii":        {"free": 5,  "basic": None,  "pro": None},
+    "img_flip":         {"free": 10, "basic": None,  "pro": None},
+    "img_border":       {"free": 5,  "basic": 30,   "pro": None},
+    "img_round":        {"free": 5,  "basic": None,  "pro": None},
+    "img_exif":         {"free": 10, "basic": None,  "pro": None},
+    "img_enhance":      {"free": 5,  "basic": 30,   "pro": None},
+    "csv2pdf":          {"free": 3,  "basic": 30,   "pro": None},
+    "txt2pdf":          {"free": 5,  "basic": 50,   "pro": None},
+    "html2pdf":         {"free": 2,  "basic": 20,   "pro": None},
+    "json2pdf":         {"free": 3,  "basic": 30,   "pro": None},
+    "hash":             {"free": 20, "basic": None,  "pro": None},
+    "steganography":    {"free": 2,  "basic": 15,   "pro": None},
+    "pdf_sign":         {"free": 2,  "basic": 20,   "pro": None},
+    "pwd_crack":        {"free": 0,  "basic": 0,    "pro": 1},
+    "img_remove_exif":  {"free": 10, "basic": None,  "pro": None},
+    "poster":           {"free": 3,  "basic": 30,   "pro": None},
+    "calendar_pdf":     {"free": 2,  "basic": 20,   "pro": None},
+    "invoice":          {"free": 2,  "basic": 20,   "pro": None},
+    "resume":           {"free": 1,  "basic": 10,   "pro": None},
+    "certificate":      {"free": 1,  "basic": 10,   "pro": None},
+    "quote_card":       {"free": 5,  "basic": 50,   "pro": None},
+    "birthday_card":    {"free": 3,  "basic": 30,   "pro": None},
+    "business_card":    {"free": 2,  "basic": 20,   "pro": None},
+    "timetable":        {"free": 2,  "basic": 20,   "pro": None},
+    "flyer":            {"free": 2,  "basic": 20,   "pro": None},
+    "zip":              {"free": 3,  "basic": 30,   "pro": None},
+    "unzip":            {"free": 3,  "basic": 30,   "pro": None},
+    "fileinfo":         {"free": 20, "basic": None,  "pro": None},
+    "qrcode_scan":      {"free": 10, "basic": None,  "pro": None},
+    "barcode":          {"free": 10, "basic": None,  "pro": None},
+    "remind":           {"free": 3,  "basic": 20,   "pro": None},
+    "notes":            {"free": 5,  "basic": 50,   "pro": None},
+    "history":          {"free": 5,  "basic": None,  "pro": None},
+    "feedback":         {"free": 5,  "basic": None,  "pro": None},
+    "referral":         {"free": 20, "basic": None,  "pro": None},
+    "handwrite":        {"free": 5,  "basic": 50,   "pro": None},
+    "addtext":          {"free": 5,  "basic": 50,   "pro": None},
+    "footer":           {"free": 5,  "basic": 50,   "pro": None},
+    "pagenos":          {"free": 3,  "basic": 30,   "pro": None},
+    "crop":             {"free": 5,  "basic": 50,   "pro": None},
+    "qr":               {"free": 10, "basic": None,  "pro": None},
+    "extract":          {"free": 3,  "basic": 30,   "pro": None},
+    "delete_pages":     {"free": 2,  "basic": 20,   "pro": None},
+    "reorder":          {"free": 3,  "basic": 30,   "pro": None},
+    "reverse":          {"free": 5,  "basic": 50,   "pro": None},
+    "pdf_compare":      {"free": 1,  "basic": 10,   "pro": None},
+    "ocr":              {"free": 3,  "basic": 20,   "pro": None},
+    "metadata":         {"free": 10, "basic": None,  "pro": None},
+    "metadata_edit":    {"free": 0,  "basic": 10,   "pro": None},
+    "pwd_strength":     {"free": 10, "basic": None,  "pro": None},
+    "pdf2epub":         {"free": 0,  "basic": 5,    "pro": None},
+    "epub2pdf":         {"free": 2,  "basic": 20,   "pro": None},
+    "doc2pdf":          {"free": 2,  "basic": 20,   "pro": None},
 }
 
 FREE_DAILY_LIMIT = 5
 
-# ─── Handwritten Fonts (14 fonts!) ───────────────
+# ─── Referral System ─────────────────────────────
+REFERRAL_BONUS_DAYS = 7
+REFERRAL_NEEDED     = 3
+
+# ─── Streak System ───────────────────────────────
+STREAK_BONUS_OPS = {3: 2, 7: 5, 14: 10, 30: 20}
+
+# ─── Daily Bonus ─────────────────────────────────
+DAILY_BONUS_OPS = 2
+
+# ─── PDF Stamp Presets ───────────────────────────
+STAMP_PRESETS = [
+    ("⛔ CONFIDENTIAL",  (180, 0,   0)),
+    ("📝 DRAFT",         (100, 100, 100)),
+    ("✅ APPROVED",      (0,   140, 0)),
+    ("❌ REJECTED",      (200, 0,   0)),
+    ("🔒 PRIVATE",       (0,   0,   150)),
+    ("📋 COPY",          (80,  80,  80)),
+    ("💰 PAID",          (0,   120, 0)),
+    ("⏳ PENDING",       (180, 120, 0)),
+]
+
+# ─── Quote Card Themes ───────────────────────────
+QUOTE_THEMES = {
+    "dark":    {"bg": (18, 18, 30),    "text": (240, 240, 255), "accent": (130, 80,  255)},
+    "light":   {"bg": (255, 255, 255), "text": (30,  30,  50),  "accent": (80,  80,  200)},
+    "sunset":  {"bg": (255, 100, 50),  "text": (255, 255, 255), "accent": (255, 220, 80)},
+    "ocean":   {"bg": (10,  80,  120), "text": (220, 245, 255), "accent": (80,  200, 220)},
+    "forest":  {"bg": (20,  60,  30),  "text": (220, 255, 220), "accent": (100, 200, 80)},
+    "rose":    {"bg": (255, 230, 235), "text": (80,  20,  40),  "accent": (220, 60,  100)},
+}
+
+# ─── Business Card Themes ────────────────────────
+BCARD_THEMES = {
+    "minimal": {"bg": (255,255,255), "accent": (30,  30,  30),  "text": (50,  50,  50)},
+    "dark":    {"bg": (20,  20,  30), "accent": (100, 100, 255), "text": (220, 220, 240)},
+    "gold":    {"bg": (30,  20,  10), "accent": (200, 160, 40),  "text": (230, 210, 160)},
+    "blue":    {"bg": (10,  40,  90), "accent": (80,  160, 255), "text": (200, 220, 255)},
+}
+
+# ─── Flyer Themes ────────────────────────────────
+FLYER_THEMES = {
+    "event":   {"bg": (20,  20,  40),  "accent": (255, 80,  120), "text": (255, 255, 255)},
+    "sale":    {"bg": (255, 40,  40),  "accent": (255, 220, 0),   "text": (255, 255, 255)},
+    "concert": {"bg": (10,  10,  20),  "accent": (120, 80,  255), "text": (255, 255, 255)},
+    "clean":   {"bg": (245, 245, 255), "accent": (60,  60,  220), "text": (20,  20,  60)},
+}
+
+# ─── Handwritten Fonts ───────────────────────────
 FONTS = {
     "caveat":       {"name": "✍️ Caveat",               "file": "fonts/Caveat.ttf"},
     "dancing":      {"name": "💃 Dancing Script",        "file": "fonts/DancingScript.ttf"},
@@ -156,43 +224,40 @@ FONTS = {
 }
 
 NOTEBOOK_STYLES = {
-    "classic_blue": {"name": "📘 Classic Blue Lines",  "bg": (255,255,255), "line_color": (0.65,0.82,1.0), "margin_color": (1.0,0.7,0.7),  "text_color": (0.05,0.05,0.3),  "line_spacing": 28, "margin_x": 70},
-    "yellow_legal": {"name": "📒 Yellow Legal Pad",    "bg": (255,252,200), "line_color": (0.7,0.85,0.5),  "margin_color": (1.0,0.4,0.4),  "text_color": (0.05,0.05,0.05), "line_spacing": 26, "margin_x": 65},
-    "graph_paper":  {"name": "📐 Graph Paper",         "bg": (248,252,255), "line_color": (0.75,0.87,1.0), "margin_color": None,            "text_color": (0.05,0.05,0.5),  "line_spacing": 20, "margin_x": 50, "is_graph": True},
-    "dotted":       {"name": "🔵 Dotted Notebook",     "bg": (255,255,255), "line_color": (0.7,0.7,0.85),  "margin_color": None,            "text_color": (0.0,0.0,0.0),    "line_spacing": 28, "margin_x": 50, "is_dotted": True},
-    "parchment":    {"name": "📜 Vintage Parchment",   "bg": (244,228,188), "line_color": (0.6,0.45,0.3),  "margin_color": (0.55,0.3,0.15), "text_color": (0.15,0.05,0.0),  "line_spacing": 30, "margin_x": 72},
-    "dark_notebook":{"name": "🌙 Dark Night Mode",     "bg": (18,18,30),    "line_color": (0.2,0.2,0.4),   "margin_color": (0.4,0.2,0.5),  "text_color": (0.9,0.95,1.0),   "line_spacing": 28, "margin_x": 70},
-    "pink_diary":   {"name": "🌸 Pink Diary",          "bg": (255,240,248), "line_color": (1.0,0.72,0.85), "margin_color": (1.0,0.5,0.7),  "text_color": (0.3,0.0,0.2),    "line_spacing": 26, "margin_x": 68},
-    "green_board":  {"name": "🟢 Chalkboard Green",    "bg": (28,55,35),    "line_color": (0.3,0.6,0.35),  "margin_color": (0.5,0.75,0.5), "text_color": (0.95,0.95,0.88), "line_spacing": 32, "margin_x": 70},
+    "classic_blue":  {"name": "📘 Classic Blue Lines",  "bg": (255,255,255), "line_color": (0.65,0.82,1.0), "margin_color": (1.0,0.7,0.7),  "text_color": (0.05,0.05,0.3),  "line_spacing": 28, "margin_x": 70},
+    "yellow_legal":  {"name": "📒 Yellow Legal Pad",    "bg": (255,252,200), "line_color": (0.7,0.85,0.5),  "margin_color": (1.0,0.4,0.4),  "text_color": (0.05,0.05,0.05), "line_spacing": 26, "margin_x": 65},
+    "graph_paper":   {"name": "📐 Graph Paper",         "bg": (248,252,255), "line_color": (0.75,0.87,1.0), "margin_color": None,            "text_color": (0.05,0.05,0.5),  "line_spacing": 20, "margin_x": 50, "is_graph": True},
+    "dotted":        {"name": "🔵 Dotted Notebook",     "bg": (255,255,255), "line_color": (0.7,0.7,0.85),  "margin_color": None,            "text_color": (0.0,0.0,0.0),    "line_spacing": 28, "margin_x": 50, "is_dotted": True},
+    "parchment":     {"name": "📜 Vintage Parchment",   "bg": (244,228,188), "line_color": (0.6,0.45,0.3),  "margin_color": (0.55,0.3,0.15), "text_color": (0.15,0.05,0.0),  "line_spacing": 30, "margin_x": 72},
+    "dark_notebook": {"name": "🌙 Dark Night Mode",     "bg": (18,18,30),    "line_color": (0.2,0.2,0.4),   "margin_color": (0.4,0.2,0.5),  "text_color": (0.9,0.95,1.0),   "line_spacing": 28, "margin_x": 70},
+    "pink_diary":    {"name": "🌸 Pink Diary",          "bg": (255,240,248), "line_color": (1.0,0.72,0.85), "margin_color": (1.0,0.5,0.7),  "text_color": (0.3,0.0,0.2),    "line_spacing": 26, "margin_x": 68},
+    "green_board":   {"name": "🟢 Chalkboard Green",    "bg": (28,55,35),    "line_color": (0.3,0.6,0.35),  "margin_color": (0.5,0.75,0.5), "text_color": (0.95,0.95,0.88), "line_spacing": 32, "margin_x": 70},
 }
 
 OCR_LANGUAGES = {
-    "eng":      {"name": "🇬🇧 English",        "tesseract": "eng"},
-    "hin":      {"name": "🇮🇳 Hindi",           "tesseract": "hin"},
-    "eng+hin":  {"name": "🇮🇳 Hindi+English",   "tesseract": "eng+hin"},
-    "spa":      {"name": "🇪🇸 Spanish",         "tesseract": "spa"},
-    "fra":      {"name": "🇫🇷 French",          "tesseract": "fra"},
-    "kor":      {"name": "🇰🇷 Korean",          "tesseract": "kor"},
-    "chi_sim":  {"name": "🇨🇳 Chinese",         "tesseract": "chi_sim"},
-    "ara":      {"name": "🇸🇦 Arabic",          "tesseract": "ara"},
-    "deu":      {"name": "🇩🇪 German",          "tesseract": "deu"},
-    "jpn":      {"name": "🇯🇵 Japanese",        "tesseract": "jpn"},
+    "eng":      {"name": "🇬🇧 English",       "tesseract": "eng"},
+    "hin":      {"name": "🇮🇳 Hindi",          "tesseract": "hin"},
+    "eng+hin":  {"name": "🇮🇳 Hindi+English",  "tesseract": "eng+hin"},
+    "spa":      {"name": "🇪🇸 Spanish",        "tesseract": "spa"},
+    "fra":      {"name": "🇫🇷 French",         "tesseract": "fra"},
+    "kor":      {"name": "🇰🇷 Korean",         "tesseract": "kor"},
+    "chi_sim":  {"name": "🇨🇳 Chinese",        "tesseract": "chi_sim"},
+    "ara":      {"name": "🇸🇦 Arabic",         "tesseract": "ara"},
+    "deu":      {"name": "🇩🇪 German",         "tesseract": "deu"},
+    "jpn":      {"name": "🇯🇵 Japanese",       "tesseract": "jpn"},
 }
 
 REACTIONS = [
     "🔥","❤️","🎉","👏","💯","⚡","🌟","😎","🚀","💎",
     "🎯","🥰","😱","🤩","👍","🙏","❤️‍🔥","💪","🏆","✨"
 ]
-REACTION_COUNT = 3
-
+REACTION_COUNT         = 3
 GROUP_REACTIONS_ENABLED = True
 GROUP_REACTION_CHANCE   = 0.3
-
 DELETE_BUTTONS_AFTER_SEC = 180
 
-BOT_VERSION = "5.0.0"
-GITHUB      = "@SerenaXdev"
-
+BOT_VERSION        = "6.0.0"
+GITHUB             = "@SerenaXdev"
 HANDWRITING_CREDIT = "Written By - Technical Serena"
 
 IMAGE_FILTERS = {
@@ -204,6 +269,10 @@ IMAGE_FILTERS = {
     "sepia":      "🟤 Sepia Tone",
     "brightness": "☀️ Brighten",
     "contrast":   "🔆 High Contrast",
+    "vivid":      "🎨 Vivid Colors",
+    "vintage":    "📷 Vintage",
+    "cool":       "❄️ Cool Tone",
+    "warm":       "🔥 Warm Tone",
 }
 
 PWD_CRACK_TIMEOUT_SEC = 60

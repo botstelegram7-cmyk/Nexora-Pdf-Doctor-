@@ -93,6 +93,23 @@ def init_sqlite():
             fire_at     TEXT,
             done        INTEGER DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS streaks (
+            user_id     INTEGER PRIMARY KEY,
+            streak      INTEGER DEFAULT 0,
+            last_date   TEXT,
+            best_streak INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS feedback (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER,
+            rating      INTEGER,
+            message     TEXT,
+            created_at  TEXT
+        );
+        CREATE TABLE IF NOT EXISTS daily_bonus (
+            user_id     INTEGER PRIMARY KEY,
+            last_bonus  TEXT
+        );
         """)
 
 init_sqlite()
@@ -464,3 +481,152 @@ async def mark_reminder_done(reminder_id: int):
     else:
         with _get_conn() as conn:
             conn.execute("UPDATE reminders SET done=1 WHERE id=?", (reminder_id,))
+
+
+# ── Streak System ─────────────────────────────────────────────────────────────
+
+async def update_streak(user_id: int) -> tuple:
+    """
+    Call once per day on first use.
+    Returns (current_streak, is_milestone, bonus_ops)
+    """
+    from config import STREAK_BONUS_OPS
+    today = _today()
+    if _mongo_db:
+        doc = await _mongo_db.streaks.find_one({"user_id": user_id})
+        if doc:
+            last = doc.get("last_date", "")
+            import datetime as dt
+            yesterday = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+            if last == today:
+                return doc["streak"], False, 0
+            streak = doc["streak"] + 1 if last == yesterday else 1
+            best   = max(streak, doc.get("best_streak", 0))
+            await _mongo_db.streaks.update_one(
+                {"user_id": user_id},
+                {"$set": {"streak": streak, "last_date": today, "best_streak": best}}
+            )
+        else:
+            streak = 1
+            await _mongo_db.streaks.insert_one(
+                {"user_id": user_id, "streak": 1, "last_date": today, "best_streak": 1}
+            )
+    else:
+        with _get_conn() as conn:
+            row = conn.execute("SELECT streak, last_date, best_streak FROM streaks WHERE user_id=?", (user_id,)).fetchone()
+            if row:
+                last = row["last_date"]
+                import datetime as dt
+                yesterday = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+                if last == today:
+                    return row["streak"], False, 0
+                streak = row["streak"] + 1 if last == yesterday else 1
+                best   = max(streak, row["best_streak"] or 0)
+                conn.execute("UPDATE streaks SET streak=?, last_date=?, best_streak=? WHERE user_id=?",
+                             (streak, today, best, user_id))
+            else:
+                streak = 1
+                conn.execute("INSERT INTO streaks(user_id,streak,last_date,best_streak) VALUES(?,1,?,1)",
+                             (user_id, today))
+
+    bonus     = STREAK_BONUS_OPS.get(streak, 0)
+    milestone = streak in STREAK_BONUS_OPS
+    return streak, milestone, bonus
+
+
+async def get_streak(user_id: int) -> dict:
+    """Return user's streak info."""
+    if _mongo_db:
+        doc = await _mongo_db.streaks.find_one({"user_id": user_id}) or {}
+        return {"streak": doc.get("streak", 0), "best": doc.get("best_streak", 0)}
+    with _get_conn() as conn:
+        row = conn.execute("SELECT streak, best_streak FROM streaks WHERE user_id=?", (user_id,)).fetchone()
+        if row:
+            return {"streak": row["streak"], "best": row["best_streak"]}
+        return {"streak": 0, "best": 0}
+
+
+# ── Daily Bonus ───────────────────────────────────────────────────────────────
+
+async def claim_daily_bonus(user_id: int) -> bool:
+    """Returns True if bonus was given (first time today), False if already claimed."""
+    from config import DAILY_BONUS_OPS
+    today = _today()
+    if _mongo_db:
+        doc = await _mongo_db.daily_bonus.find_one({"user_id": user_id})
+        if doc and doc.get("last_bonus") == today:
+            return False
+        await _mongo_db.daily_bonus.update_one(
+            {"user_id": user_id}, {"$set": {"last_bonus": today}}, upsert=True
+        )
+    else:
+        with _get_conn() as conn:
+            row = conn.execute("SELECT last_bonus FROM daily_bonus WHERE user_id=?", (user_id,)).fetchone()
+            if row and row["last_bonus"] == today:
+                return False
+            conn.execute("INSERT OR REPLACE INTO daily_bonus(user_id,last_bonus) VALUES(?,?)",
+                         (user_id, today))
+    return True
+
+
+# ── Feedback ─────────────────────────────────────────────────────────────────
+
+async def save_feedback(user_id: int, rating: int, message: str = ""):
+    if _mongo_db:
+        await _mongo_db.feedback.insert_one({
+            "user_id": user_id, "rating": rating,
+            "message": message, "created_at": _now()
+        })
+    else:
+        with _get_conn() as conn:
+            conn.execute(
+                "INSERT INTO feedback(user_id,rating,message,created_at) VALUES(?,?,?,?)",
+                (user_id, rating, message, _now())
+            )
+
+
+async def get_feedback_stats() -> dict:
+    if _mongo_db:
+        total = await _mongo_db.feedback.count_documents({})
+        pipe  = [{"$group": {"_id": None, "avg": {"$avg": "$rating"}}}]
+        res   = await _mongo_db.feedback.aggregate(pipe).to_list(1)
+        avg   = round(res[0]["avg"], 1) if res else 0.0
+        return {"total": total, "avg_rating": avg}
+    with _get_conn() as conn:
+        row = conn.execute("SELECT COUNT(*), AVG(rating) FROM feedback").fetchone()
+        return {"total": row[0] or 0, "avg_rating": round(row[1] or 0.0, 1)}
+
+
+async def get_recent_feedback(limit: int = 10) -> list:
+    if _mongo_db:
+        return await _mongo_db.feedback.find().sort("created_at", -1).to_list(limit)
+    with _get_conn() as conn:
+        rows = conn.execute(
+            "SELECT user_id, rating, message, created_at FROM feedback ORDER BY created_at DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# ── Referral System ───────────────────────────────────────────────────────────
+
+async def get_referral_count(user_id: int) -> int:
+    if _mongo_db:
+        return await _mongo_db.users.count_documents({"referred_by": user_id})
+    with _get_conn() as conn:
+        row = conn.execute("SELECT COUNT(*) FROM referrals WHERE referrer_id=?", (user_id,)).fetchone()
+        return row[0] if row else 0
+
+
+async def get_referral_link_text(user_id: int, bot_username: str) -> str:
+    count = await get_referral_count(user_id)
+    from config import REFERRAL_NEEDED, REFERRAL_BONUS_DAYS
+    remaining = max(0, REFERRAL_NEEDED - (count % REFERRAL_NEEDED))
+    link      = f"https://t.me/{bot_username}?start=ref_{user_id}"
+    return (
+        f"👥 <b>Your Referral Link:</b>\n"
+        f"<code>{link}</code>\n\n"
+        f"📊 Total referred: <b>{count}</b>\n"
+        f"🎯 {remaining} more → <b>+{REFERRAL_BONUS_DAYS} days Basic FREE!</b>\n\n"
+        f"💡 Share this link and earn rewards!"
+    )
