@@ -2,7 +2,7 @@
 Database v5 — SQLite (default) or MongoDB.
 New: notes, file history, reminders, bulk sessions.
 """
-import sqlite3, os, datetime
+import sqlite3, os, datetime, asyncio
 from config import MONGODB_URL
 
 _mongo_db = None
