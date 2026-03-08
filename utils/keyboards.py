@@ -486,3 +486,47 @@ def poster_theme_menu():
         [B("🌈 Gradient",  callback_data="poster_gradient")],
         [B("🏠 Back",      callback_data="back_main")],
     ])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7 MENUS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def student_menu():
+    return M([
+        [B("📚 Flashcards",       callback_data="menu_flashcard"),
+         B("🧠 Mind Map",         callback_data="menu_mindmap")],
+        [B("📅 Study Schedule",   callback_data="menu_study_schedule"),
+         B("📋 Assignments",      callback_data="menu_assign")],
+        [B("🍅 Pomodoro Timer",   callback_data="menu_pomodoro")],
+        [B("🏠 Back",             callback_data="back_main")],
+    ])
+
+
+def coins_menu():
+    return M([
+        [B("🪙 My Coins",        callback_data="menu_coins"),
+         B("💰 Earn Coins",      callback_data="menu_earn")],
+        [B("💸 Spend Coins",     callback_data="coin_spend_menu")],
+        [B("🏠 Back",            callback_data="back_main")],
+    ])
+
+
+def monetize_menu():
+    return M([
+        [B("🎁 Free Trial",      callback_data="menu_trial"),
+         B("🎟️ Promo Code",     callback_data="menu_redeem")],
+        [B("💎 Premium",         callback_data="menu_premium"),
+         B("👥 Referral",        callback_data="menu_referral")],
+        [B("🏠 Back",            callback_data="back_main")],
+    ])
+
+
+def pdf_advanced_menu():
+    return M([
+        [B("📋 Flatten Forms",   callback_data="menu_pdf_flatten"),
+         B("🖊️ Annotate",       callback_data="menu_pdf_annotate")],
+        [B("✂️ Split by Size",   callback_data="menu_pdf_split_size"),
+         B("📊 Extract Tables",  callback_data="menu_pdf_table")],
+        [B("🏠 Back",            callback_data="back_main")],
+    ])
