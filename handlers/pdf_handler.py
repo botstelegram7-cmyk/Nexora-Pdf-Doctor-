@@ -168,6 +168,9 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if data.startswith("nbstyle_"):
         await _nbstyle_selected(update, ctx, data[8:])
         return
+    if data.startswith("style_"):          # keyboards.py sends "style_X" — alias fix
+        await _nbstyle_selected(update, ctx, data[6:])
+        return
     if data.startswith("ocrlang_"):
         await _ocrlang_selected(update, ctx, data[8:])
         return
