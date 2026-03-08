@@ -1,10 +1,13 @@
 """
-Nexora PDF Doctor Bot v7.0 — Main Entry Point
+Nexora PDF Doctor Bot v8.0 — Main Entry Point
 =====================================================
-v7 New: Auto-detect files, Animated progress bars, Quick action buttons,
-        Coin system, Trial, Promo codes, Achievements, Stats card, Leaderboard,
-        Flashcards, Mind maps, Study schedule, Assignment tracker, Pomodoro,
-        PDF Flatten, PDF Annotate, PDF Split by Size, PDF Table Extract
+v8 Fixes: style_/nbstyle_ mismatch, lang_XX, note_delete, wm_text/logo,
+          impose_4up, all menu_convert_ callbacks, do_lock/do_unlock
+v8 New:   Smart Compress (3 levels), PDF Diff, PDF Background Image,
+          ZIP→PDF, Batch Mode, Spin Wheel, Gift Premium, Favorites,
+          Bot Themes, Onboarding Flow, Smart Help (/help category),
+          Group Stats (/gstats), Admin Panel (/admin), Auto-Rename,
+          22 Handwriting Fonts, 14 Notebook Themes, Original Filenames
 """
 import asyncio, logging, traceback
 from aiohttp import web
@@ -57,6 +60,15 @@ from handlers.new_features_handler import (
     cmd_feedback, cmd_referral, cmd_streak,
     handle_new_features_v6, handle_new_callbacks_v6,
 )
+from handlers.v8_handler import (
+    # Bug fixes (all broken callbacks)
+    handle_v8_callbacks, handle_v8_features,
+    # New commands
+    cmd_smart_compress, cmd_pdf_diff, cmd_pdf_bg_img, cmd_zip2pdf,
+    cmd_batch, cmd_fav, cmd_theme, cmd_spin, cmd_gift,
+    cmd_gstats, cmd_admin, cmd_smart_help,
+    check_and_show_onboarding,
+)
 from handlers.v7_handler import (
     # UX
     auto_detect_and_suggest, notify_achievements, award_coins_for_op,
@@ -75,7 +87,17 @@ from handlers.admin_handler import admin_panel
 
 # ── Bot Commands ──────────────────────────────────────────────────────────────
 BOT_COMMANDS = [
-    BotCommand("start",             "🏠 Main Menu"),
+    BotCommand("smart_compress",    "🧠 Smart 3-Level Compress"),
+    BotCommand("pdf_diff",          "🔍 Visual PDF Diff (Compare)"),
+    BotCommand("pdf_bg_img",        "🎨 PDF Background Image"),
+    BotCommand("zip2pdf",           "📦 ZIP of Images → PDF"),
+    BotCommand("batch",             "📦 Batch Process Multiple Files"),
+    BotCommand("fav",               "⭐ Favorite Commands"),
+    BotCommand("theme",             "🎨 Bot Theme (Dark/Light/Neon)"),
+    BotCommand("spin",              "🎰 Daily Spin Wheel"),
+    BotCommand("gift",              "🎁 Gift Premium to User"),
+    BotCommand("gstats",            "📊 Group Statistics"),
+    BotCommand("admin",             "🛡️ Admin Panel (Owner Only)"),
     BotCommand("help",              "❓ Help & Commands"),
     BotCommand("account",           "👤 My Account"),
     BotCommand("dashboard",         "📊 Usage Dashboard"),
@@ -273,7 +295,9 @@ async def unified_message_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE
         return
     asyncio.create_task(handle_daily_events(user.id, ctx.bot, update.effective_chat.id))
 
-    # Handler priority: v7 → auto-detect → v6 → v5 → original
+    # Handler priority: v8 fixes → v7 → auto-detect → v6 → v5 → original
+    if await handle_v8_features(update, ctx):
+        return
     if await handle_v7_features(update, ctx):
         return
     if await handle_new_features_v6(update, ctx):
@@ -286,12 +310,17 @@ async def unified_message_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE
         if not state:
             if await auto_detect_and_suggest(update, ctx):
                 return
+    # Onboarding for new users (first time)
+    asyncio.create_task(check_and_show_onboarding(update, ctx, user.id))
     await handle_message(update, ctx)
 
 
 # ── Unified callback handler ──────────────────────────────────────────────────
 
 async def unified_callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    # v8 FIRST — contains all bug fixes for broken callbacks
+    if await handle_v8_callbacks(update, ctx):
+        return
     if await handle_v7_callbacks(update, ctx):
         return
     if await handle_new_callbacks_v6(update, ctx):
@@ -427,6 +456,20 @@ def build_app() -> Application:
     cmd("dashboard",         cmd_dashboard)
     cmd("premium",           premium_cmd)
     cmd("lang",              cmd_lang)
+
+    # v8 New Commands
+    cmd("smart_compress",  cmd_smart_compress)
+    cmd("pdf_diff",        cmd_pdf_diff)
+    cmd("pdf_bg_img",      cmd_pdf_bg_img)
+    cmd("zip2pdf",         cmd_zip2pdf)
+    cmd("batch",           cmd_batch)
+    cmd("fav",             cmd_fav)
+    cmd("theme",           cmd_theme)
+    cmd("spin",            cmd_spin)
+    cmd("gift",            cmd_gift)
+    cmd("gstats",          cmd_gstats)
+    cmd("admin",           cmd_admin)
+    cmd("help",            cmd_smart_help)  # Override with smart help
 
     # v7 UX & Monetization
     cmd("trial",             cmd_trial)
@@ -577,8 +620,9 @@ async def main():
         logger.error("BOT_TOKEN not set!")
         return
     try:
-        from utils.font_loader import download_fonts
+        from utils.font_loader import download_fonts, download_extra_fonts
         download_fonts()
+        download_extra_fonts()
     except Exception as e:
         logger.warning(f"Fonts: {e}")
 

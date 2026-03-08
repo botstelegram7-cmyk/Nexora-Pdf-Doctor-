@@ -352,3 +352,76 @@ ACHIEVEMENTS = {
     "month_streak":  {"emoji": "💎", "name": "Month Master",     "desc": "30-day streak!",        "streak": 30},
     "social_star":   {"emoji": "⭐", "name": "Social Star",      "desc": "Referred 5 friends",    "refs": 5},
 }
+
+# ─── v8: New Handwriting Fonts ───────────────────────────────────────────────
+# Added to existing FONTS dict
+EXTRA_FONTS = {
+    "architects":   {"name": "🏛️ Architects Daughter", "file": "fonts/ArchitectsDaughter.ttf"},
+    "handlee":      {"name": "✍️ Handlee",              "file": "fonts/Handlee.ttf"},
+    "gochi":        {"name": "🌀 Gochi Hand",           "file": "fonts/GochiHand.ttf"},
+    "chilanka":     {"name": "🌺 Chilanka",             "file": "fonts/Chilanka.ttf"},
+    "glory":        {"name": "📜 Just Another Hand",    "file": "fonts/JustAnotherHand.ttf"},
+    "kristi":       {"name": "🌿 Kristi",               "file": "fonts/Kristi.ttf"},
+    "marck":        {"name": "🎭 Marck Script",         "file": "fonts/MarckScript.ttf"},
+    "neucha":       {"name": "📝 Neucha",               "file": "fonts/Neucha.ttf"},
+}
+
+EXTRA_FONT_URLS = {
+    "ArchitectsDaughter.ttf": "https://fonts.gstatic.com/s/architectsdaughter/v18/KtkxAKiDZI_td1Lkx62xHZHDtgO_Y-bvfY5q4szgE-Q.ttf",
+    "Handlee.ttf":            "https://fonts.gstatic.com/s/handlee/v16/-F6xfjBsISg9aMakDmr6oilJ3ik.ttf",
+    "GochiHand.ttf":          "https://fonts.gstatic.com/s/gochihand/v23/hES06XlnGxtbbhrsduoz-TMwSiT_R4qTp.ttf",
+    "Chilanka.ttf":           "https://fonts.gstatic.com/s/chilanka/v16/WWXRlj2DZQiMJYaYRqJXTqBnJnQm.ttf",
+    "JustAnotherHand.ttf":    "https://fonts.gstatic.com/s/justanotherhand/v21/845CNN4-AJyIGvIou-6yJKh09rs5PsBBkRMsDpr.ttf",
+    "Kristi.ttf":             "https://fonts.gstatic.com/s/kristi/v23/uK_y4ricdeU6zwdRCh0TMv6EXw.ttf",
+    "MarckScript.ttf":        "https://fonts.gstatic.com/s/marckscript/v20/nwpTtK2oNgBA3Or78gapdwuyzDDn_g0bvg.ttf",
+    "Neucha.ttf":             "https://fonts.gstatic.com/s/neucha/v18/q5uGsou0JOdh94bvugNsCxVEgA.ttf",
+}
+
+# ─── v8: New Notebook Themes ─────────────────────────────────────────────────
+EXTRA_NOTEBOOK_STYLES = {
+    "grid_blue":    {"name": "🔷 Blue Grid",        "bg": (240,247,255), "line_color": (0.6,0.8,1.0),  "margin_color": None, "text_color": (0.05,0.05,0.3),  "line_spacing": 22, "margin_x": 50, "is_graph": True},
+    "watercolor":   {"name": "🎨 Watercolor",       "bg": (255,252,245), "line_color": (0.85,0.75,0.9),"margin_color": (0.9,0.6,0.7),"text_color": (0.2,0.1,0.3),  "line_spacing": 30, "margin_x": 70},
+    "blackboard":   {"name": "⬛ Blackboard",        "bg": (15,25,20),    "line_color": (0.25,0.5,0.3), "margin_color": None, "text_color": (1.0,1.0,0.9),    "line_spacing": 32, "margin_x": 55},
+    "college_rule": {"name": "📓 College Rule",     "bg": (255,255,255), "line_color": (0.55,0.75,1.0),"margin_color": (1.0,0.5,0.5),"text_color": (0.0,0.0,0.0),  "line_spacing": 24, "margin_x": 75},
+    "cream_linen":  {"name": "🧸 Cream Linen",      "bg": (252,248,238), "line_color": (0.75,0.68,0.55),"margin_color": None,"text_color": (0.2,0.12,0.05), "line_spacing": 28, "margin_x": 50},
+    "neon_dark":    {"name": "⚡ Neon Dark",         "bg": (5,5,15),      "line_color": (0.1,0.9,0.6),  "margin_color": (0.9,0.1,0.6),"text_color": (0.0,1.0,0.8),  "line_spacing": 28, "margin_x": 70},
+}
+
+# ─── v8: Spin Wheel Prizes ───────────────────────────────────────────────────
+SPIN_PRIZES = [
+    {"label": "5 🪙",     "type": "coins",  "value": 5,   "weight": 30, "emoji": "🪙"},
+    {"label": "10 🪙",    "type": "coins",  "value": 10,  "weight": 25, "emoji": "💰"},
+    {"label": "25 🪙",    "type": "coins",  "value": 25,  "weight": 15, "emoji": "💎"},
+    {"label": "50 🪙",    "type": "coins",  "value": 50,  "weight": 8,  "emoji": "🏆"},
+    {"label": "+1 Op",    "type": "op",     "value": 1,   "weight": 12, "emoji": "⚡"},
+    {"label": "+3 Ops",   "type": "op",     "value": 3,   "weight": 6,  "emoji": "🔥"},
+    {"label": "Nothing",  "type": "none",   "value": 0,   "weight": 3,  "emoji": "💨"},
+    {"label": "JACKPOT!", "type": "coins",  "value": 200, "weight": 1,  "emoji": "🎰"},
+]
+SPIN_COOLDOWN_HOURS = 24  # Once per day
+
+# ─── v8: Bot Themes ──────────────────────────────────────────────────────────
+BOT_THEMES = {
+    "default": {"name": "🤖 Default",    "emoji_set": {"ok": "✅", "err": "❌", "file": "📎", "star": "⭐"}},
+    "dark":    {"name": "🌙 Dark Mode",  "emoji_set": {"ok": "🟢", "err": "🔴", "file": "🗂️", "star": "💎"}},
+    "neon":    {"name": "⚡ Neon",        "emoji_set": {"ok": "💚", "err": "💔", "file": "⚡", "star": "🌟"}},
+    "minimal": {"name": "📐 Minimal",    "emoji_set": {"ok": "·", "err": "×", "file": "→",  "star": "•"}},
+}
+
+# ─── v8: Favorites Config ────────────────────────────────────────────────────
+MAX_FAVORITES = 8
+
+# ─── v8: Smart Compress levels ───────────────────────────────────────────────
+SMART_COMPRESS_LEVELS = {
+    "eco":    {"name": "🌱 Eco (Max Compression)",  "img_quality": 50,  "img_max": 800,  "dpi": 72},
+    "normal": {"name": "⚖️ Normal (Balanced)",       "img_quality": 72,  "img_max": 1200, "dpi": 96},
+    "hq":     {"name": "💎 HQ (Best Quality)",       "img_quality": 88,  "img_max": 1800, "dpi": 150},
+}
+
+# ─── v8: Auto-Rename Rules ───────────────────────────────────────────────────
+AUTO_RENAME_PATTERNS = {
+    "invoice":     ["invoice", "inv", "bill", "receipt"],
+    "assignment":  ["homework", "hw", "assignment", "task"],
+    "notes":       ["notes", "note", "class", "lecture"],
+    "report":      ["report", "thesis", "research", "paper"],
+}
