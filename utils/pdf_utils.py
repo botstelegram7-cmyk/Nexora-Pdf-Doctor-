@@ -2411,3 +2411,247 @@ def format_streak_message(streak: int) -> str:
 
 def get_plan_badge(plan: str) -> str:
     return {"free": "🆓 Free", "basic": "⭐ Basic", "pro": "👑 Pro"}.get(plan, "🆓 Free")
+
+
+# =============================================================================
+# MISSING FUNCTIONS — Bug Fixes & Aliases (Added patch)
+# =============================================================================
+
+# ── BG color name → RGB mapping ───────────────────────────────────────────────
+_BG_COLOR_MAP = {
+    "bg_dark":   (30,  30,  45),
+    "bg_white":  (255, 255, 255),
+    "bg_yellow": (255, 252, 180),
+    "bg_green":  (210, 245, 220),
+    "bg_blue":   (210, 228, 255),
+    "bg_pink":   (255, 214, 230),
+}
+
+def change_bg(data: bytes, color_key) -> bytes:
+    """Change PDF background color. Accepts color key string or (r,g,b) tuple."""
+    if isinstance(color_key, str):
+        rgb = _BG_COLOR_MAP.get(color_key, (255, 255, 255))
+    else:
+        rgb = color_key
+    return change_bg_color(data, rgb)
+
+
+def watermark_text(data: bytes, text: str, invisible: bool = False) -> bytes:
+    """Add text watermark. If invisible=True, uses near-transparent opacity."""
+    with fitz.open(stream=data, filetype="pdf") as doc:
+        for page in doc:
+            w, h = page.rect.width, page.rect.height
+            opacity = 0.03 if invisible else 0.18
+            page.insert_text(
+                fitz.Point(w * 0.15, h * 0.55),
+                text,
+                fontsize=52,
+                color=(0.75, 0.75, 0.75),
+                rotate=45,
+                fill_opacity=opacity,
+                overlay=True,
+            )
+        buf = io.BytesIO()
+        doc.save(buf)
+        return buf.getvalue()
+
+
+def watermark_image(data: bytes, logo_bytes: bytes) -> bytes:
+    """Add image watermark to all PDF pages."""
+    return add_watermark_image(data, logo_bytes)
+
+
+def resize_pdf_to_a4(data: bytes) -> bytes:
+    """Resize all PDF pages to A4."""
+    return resize_to_a4(data)
+
+
+def auto_rotate_pdf(data: bytes) -> bytes:
+    """Auto-detect and fix page rotation based on content orientation."""
+    with fitz.open(stream=data, filetype="pdf") as doc:
+        for page in doc:
+            rotation = page.rotation
+            # Only correct clearly wrong rotations that aren't multiples of 90
+            if rotation not in (0, 90, 180, 270):
+                page.set_rotation(0)
+        buf = io.BytesIO()
+        doc.save(buf)
+        return buf.getvalue()
+
+
+def ocr_image(data: bytes, lang: str = "eng+hin") -> str:
+    """Run OCR on an image (PNG/JPG/etc.) and return extracted text."""
+    try:
+        import pytesseract
+        img = Image.open(io.BytesIO(data)).convert("RGB")
+        config = "--psm 6 --oem 3"
+        text = pytesseract.image_to_string(img, config=config, lang=lang)
+        return text.strip() if text.strip() else "⚠️ No text found in image."
+    except ImportError:
+        return "⚠️ pytesseract not installed. Run: pip install pytesseract"
+    except Exception as e:
+        return f"⚠️ OCR Error: {e}"
+
+
+def pdf_to_grayscale(data: bytes) -> bytes:
+    """Convert PDF to grayscale (alias for pdf_grayscale)."""
+    return pdf_grayscale(data)
+
+
+def create_handwritten_jpg(text: str, font_key: str,
+                            notebook_style: str = "classic_blue",
+                            title: str = "",
+                            credit: str = "Written By - Technical Serena") -> list:
+    """
+    Render handwritten notebook pages as JPEG images.
+    Returns a list of bytes (one JPEG per page).
+    """
+    import datetime
+    from utils.font_loader import get_font_path
+    from config import FONTS, NOTEBOOK_STYLES
+
+    # ── Page size (A4 at 150 dpi) ─────────────────────────────────────────────
+    DPI       = 150
+    PX_W      = int(595 * DPI / 72)   # ≈ 1240 px
+    PX_H      = int(842 * DPI / 72)   # ≈ 1754 px
+    SCALE     = DPI / 72              # ≈ 2.08
+
+    style     = NOTEBOOK_STYLES.get(notebook_style, NOTEBOOK_STYLES["classic_blue"])
+    timestamp = datetime.datetime.now().strftime("%d %b %Y  |  %I:%M %p")
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+    def _rgb(tup):
+        if isinstance(tup[0], float):
+            return tuple(int(c * 255) for c in tup)
+        return tuple(tup)
+
+    bg_rgb    = style["bg"] if isinstance(style["bg"], tuple) else (255, 255, 255)
+    tc        = _rgb(style["text_color"])
+    lc        = _rgb(style["line_color"])
+    mc        = _rgb(style["margin_color"]) if style.get("margin_color") else None
+    is_graph  = style.get("is_graph",  False)
+    is_dotted = style.get("is_dotted", False)
+    hdr_bg    = tuple(max(0, c - 18) for c in bg_rgb)
+
+    line_spacing  = int(style["line_spacing"] * SCALE)
+    margin_x      = int(style["margin_x"]     * SCALE)
+    HEADER_H      = int(55   * SCALE)
+    TOP_LINE_Y    = PX_H - HEADER_H - int(18 * SCALE)
+    font_size_px  = int(16   * SCALE)
+
+    # ── Font loading ──────────────────────────────────────────────────────────
+    font_path = get_font_path(font_key)
+    try:
+        title_font = ImageFont.truetype(font_path, int(18 * SCALE)) if font_path else ImageFont.load_default()
+        body_font  = ImageFont.truetype(font_path, font_size_px)    if font_path else ImageFont.load_default()
+    except Exception:
+        title_font = body_font = ImageFont.load_default()
+    small_font = ImageFont.load_default()
+
+    # ── Page factory ──────────────────────────────────────────────────────────
+    def _make_page():
+        img  = Image.new("RGB", (PX_W, PX_H), bg_rgb)
+        draw = ImageDraw.Draw(img)
+
+        # Header
+        draw.rectangle([0, 0, PX_W, HEADER_H], fill=hdr_bg)
+        disp_title = title.strip() or "Handwritten Notes"
+        try:
+            tb = draw.textbbox((0, 0), disp_title, font=title_font)
+            tw = tb[2] - tb[0]
+            draw.text(((PX_W - tw) // 2, int(10 * SCALE)), disp_title, font=title_font, fill=tc)
+        except Exception:
+            draw.text((int(20 * SCALE), int(10 * SCALE)), disp_title, font=title_font, fill=tc)
+
+        # Timestamp
+        try:
+            draw.text((PX_W - int(220 * SCALE), int(6 * SCALE)), timestamp, font=small_font, fill=lc)
+        except Exception:
+            pass
+
+        # Separator
+        draw.line([int(35 * SCALE), HEADER_H + 2, PX_W - int(35 * SCALE), HEADER_H + 2], fill=lc, width=1)
+
+        # Lines / grid / dots
+        if is_graph:
+            for y in range(TOP_LINE_Y, int(30 * SCALE), -line_spacing):
+                draw.line([int(35 * SCALE), y, PX_W - int(35 * SCALE), y], fill=lc, width=1)
+            for x in range(int(35 * SCALE), PX_W - int(35 * SCALE), line_spacing):
+                draw.line([x, TOP_LINE_Y, x, int(30 * SCALE)], fill=lc, width=1)
+        elif is_dotted:
+            for y in range(TOP_LINE_Y, int(30 * SCALE), -line_spacing):
+                for x in range(int(50 * SCALE), PX_W - int(35 * SCALE), line_spacing):
+                    draw.ellipse([x - 2, y - 2, x + 2, y + 2], fill=lc)
+        else:
+            for y in range(TOP_LINE_Y, int(30 * SCALE), -line_spacing):
+                draw.line([int(35 * SCALE), y, PX_W - int(35 * SCALE), y], fill=lc, width=1)
+            if mc:
+                draw.line([margin_x, HEADER_H + int(4 * SCALE), margin_x, int(30 * SCALE)],
+                          fill=mc, width=max(1, int(1.5 * SCALE)))
+        return img, draw
+
+    def _add_credit(draw):
+        if not credit:
+            return
+        try:
+            draw.text((PX_W - int(220 * SCALE), PX_H - int(20 * SCALE)), credit, font=small_font, fill=lc)
+        except Exception:
+            pass
+
+    # ── Word wrap ─────────────────────────────────────────────────────────────
+    max_w      = PX_W - margin_x - int(45 * SCALE)
+    _tmp_img   = Image.new("RGB", (10, 10))
+    _tmp_draw  = ImageDraw.Draw(_tmp_img)
+
+    def _wrap(content: str) -> list:
+        result = []
+        for para in content.split("\n"):
+            words = para.split()
+            if not words:
+                result.append("")
+                continue
+            line = ""
+            for word in words:
+                test = (line + " " + word).strip()
+                try:
+                    tb = _tmp_draw.textbbox((0, 0), test, font=body_font)
+                    w_ = tb[2] - tb[0]
+                except Exception:
+                    w_ = len(test) * font_size_px * 0.6
+                if w_ < max_w:
+                    line = test
+                else:
+                    result.append(line)
+                    line = word
+            result.append(line)
+        return result
+
+    # ── Render ────────────────────────────────────────────────────────────────
+    lines         = _wrap(text)
+    pages_out     = []
+    img, draw     = _make_page()
+    y_pos         = TOP_LINE_Y
+    text_x        = margin_x + int(6 * SCALE)
+    bottom_margin = int(45 * SCALE)
+
+    for line in lines:
+        if y_pos < bottom_margin:
+            _add_credit(draw)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=90)
+            pages_out.append(buf.getvalue())
+            img, draw = _make_page()
+            y_pos = TOP_LINE_Y
+
+        if line:
+            try:
+                draw.text((text_x, y_pos - font_size_px), line, font=body_font, fill=tc)
+            except Exception:
+                pass
+        y_pos -= line_spacing
+
+    _add_credit(draw)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=90)
+    pages_out.append(buf.getvalue())
+    return pages_out
