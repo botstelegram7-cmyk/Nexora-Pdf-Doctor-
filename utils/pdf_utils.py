@@ -2506,60 +2506,70 @@ def create_handwritten_jpg(text: str, font_key: str,
                             title: str = "",
                             credit: str = "Written By - Technical Serena") -> list:
     """
-    Render handwritten notebook pages as JPEG images.
-    Returns a list of bytes (one JPEG per page).
+    Render handwritten notebook pages as JPEG images — PDF-quality output.
 
-    COORDINATE FIX: PIL y=0 is TOP, increases downward.
-    Text starts just below header and moves DOWN each line.
+    Strategy: Render at 2× resolution (super-sampling), then downscale
+    with LANCZOS for smooth anti-aliased lines identical to PDF viewer output.
+
+    PIL coordinate system: y=0 at TOP, increases DOWNWARD.
     """
     import datetime
     from utils.font_loader import get_font_path
     from config import NOTEBOOK_STYLES
 
     # ── IST Timezone (UTC+5:30) ───────────────────────────────────────────────
-    IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-    now = datetime.datetime.now(IST)
+    IST       = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+    now       = datetime.datetime.now(IST)
     timestamp = now.strftime("%d %b %Y  |  %I:%M %p IST")
 
-    # ── Page size: A4 at 150 DPI ──────────────────────────────────────────────
-    DPI          = 150
-    PX_W         = int(595 * DPI / 72)   # ≈ 1240 px
-    PX_H         = int(842 * DPI / 72)   # ≈ 1754 px
-    SCALE        = DPI / 72              # ≈ 2.083
+    # ── Target size: A4 at 150 DPI (final output) ─────────────────────────────
+    FINAL_W  = int(595 * 150 / 72)   # 1240 px
+    FINAL_H  = int(842 * 150 / 72)   # 1754 px
 
-    style        = NOTEBOOK_STYLES.get(notebook_style, NOTEBOOK_STYLES["classic_blue"])
+    # ── Render at 2× super-sampling for anti-aliasing ─────────────────────────
+    SS       = 2                       # super-sampling factor
+    PX_W     = FINAL_W * SS            # 2480 px
+    PX_H     = FINAL_H * SS            # 3508 px
+    # SCALE maps PDF points → super-sampled pixels: 150*2/72 ≈ 4.167
+    SCALE    = 150 * SS / 72
+
+    style    = NOTEBOOK_STYLES.get(notebook_style, NOTEBOOK_STYLES["classic_blue"])
 
     # ── Color helpers ─────────────────────────────────────────────────────────
     def _rgb(tup):
-        """Convert 0.0-1.0 float tuple → 0-255 int tuple."""
         if tup and isinstance(tup[0], float):
             return tuple(int(c * 255) for c in tup)
         return tuple(tup)
 
-    bg_rgb    = style["bg"] if isinstance(style["bg"], tuple) else (255, 255, 255)
+    bg_rgb    = tuple(style["bg"]) if isinstance(style["bg"], tuple) else (255, 255, 255)
     tc        = _rgb(style["text_color"])
     lc        = _rgb(style["line_color"])
     mc        = _rgb(style["margin_color"]) if style.get("margin_color") else None
     is_graph  = style.get("is_graph",  False)
     is_dotted = style.get("is_dotted", False)
-    hdr_bg    = tuple(max(0, c - 18) for c in bg_rgb)
 
-    # ── Dimensions ───────────────────────────────────────────────────────────
-    line_spacing = int(style["line_spacing"] * SCALE)
-    margin_x     = int(style["margin_x"]     * SCALE)
-    HEADER_H     = int(55 * SCALE)            # header bar height (pixels)
-    CONTENT_TOP  = HEADER_H + int(8 * SCALE)  # where first notebook line starts
-    CONTENT_BOT  = PX_H - int(40 * SCALE)     # bottom margin
-    font_size_px = int(16 * SCALE)
+    # Header bg: slightly darker than page bg (same as PDF)
+    hdr_bg = tuple(max(0, c - 18) for c in bg_rgb)
+
+    # ── Layout dimensions (in super-sampled pixels) ───────────────────────────
+    # Match PDF exactly: header=55pt, content starts at 55+18=73pt from top,
+    # content ends at 30pt from bottom, margin_x and line_spacing from style.
+    HEADER_H      = int(55   * SCALE)
+    SEP_Y         = HEADER_H + SS            # separator line y position
+    CONTENT_TOP   = HEADER_H + int(18 * SCALE)   # first text/line area
+    CONTENT_BOT   = PX_H - int(30 * SCALE)       # bottom of content
+    line_spacing  = int(style["line_spacing"] * SCALE)
+    margin_x      = int(style["margin_x"]     * SCALE)
+    font_size_px  = int(16   * SCALE)
 
     # ── Font loading ──────────────────────────────────────────────────────────
     font_path = get_font_path(font_key)
     try:
         title_font = ImageFont.truetype(font_path, int(18 * SCALE)) if font_path else ImageFont.load_default()
         body_font  = ImageFont.truetype(font_path, font_size_px)    if font_path else ImageFont.load_default()
+        small_font = ImageFont.truetype(font_path, int(8  * SCALE)) if font_path else ImageFont.load_default()
     except Exception:
-        title_font = body_font = ImageFont.load_default()
-    small_font = ImageFont.load_default()
+        title_font = body_font = small_font = ImageFont.load_default()
 
     # ── Page factory ──────────────────────────────────────────────────────────
     def _make_page():
@@ -2568,45 +2578,54 @@ def create_handwritten_jpg(text: str, font_key: str,
 
         # ── Header bar ────────────────────────────────────────────────────────
         draw.rectangle([0, 0, PX_W, HEADER_H], fill=hdr_bg)
+
         disp_title = title.strip() or "Handwritten Notes"
         try:
             tb = draw.textbbox((0, 0), disp_title, font=title_font)
             tw = tb[2] - tb[0]
-            draw.text(((PX_W - tw) // 2, int(12 * SCALE)), disp_title, font=title_font, fill=tc)
+            th = tb[3] - tb[1]
+            tx = (PX_W - tw) // 2
+            ty = (HEADER_H - th) // 2
+            draw.text((tx, ty), disp_title, font=title_font, fill=tc)
         except Exception:
             draw.text((int(20 * SCALE), int(12 * SCALE)), disp_title, font=title_font, fill=tc)
 
-        # Timestamp — top-right
+        # Timestamp — top-right, vertically centered in header
         try:
-            ts_w = draw.textlength(timestamp, font=small_font)
-            draw.text((PX_W - ts_w - int(15 * SCALE), int(8 * SCALE)), timestamp, font=small_font, fill=lc)
+            tb2 = draw.textbbox((0, 0), timestamp, font=small_font)
+            ts_w = tb2[2] - tb2[0]
+            ts_h = tb2[3] - tb2[1]
+            draw.text((PX_W - ts_w - int(15 * SCALE), (HEADER_H - ts_h) // 2),
+                      timestamp, font=small_font, fill=lc)
         except Exception:
             pass
 
-        # Separator line below header
-        draw.line([int(35 * SCALE), HEADER_H + 2, PX_W - int(35 * SCALE), HEADER_H + 2],
-                  fill=lc, width=max(1, int(0.6 * SCALE)))
+        # ── Separator line (thin, 0.8pt equivalent) ───────────────────────────
+        draw.line([int(35 * SCALE), SEP_Y, PX_W - int(35 * SCALE), SEP_Y],
+                  fill=lc, width=SS)
 
-        # ── Notebook lines (PIL y increases downward) ─────────────────────────
-        # Lines go from CONTENT_TOP down to CONTENT_BOT, stepping by line_spacing
-        line_ys = range(CONTENT_TOP + line_spacing, CONTENT_BOT, line_spacing)
+        # ── Notebook lines ─────────────────────────────────────────────────────
+        # First line sits at CONTENT_TOP, subsequent lines spaced by line_spacing
+        first_line_y = CONTENT_TOP + line_spacing
+        line_ys = range(first_line_y, CONTENT_BOT, line_spacing)
 
         if is_graph:
             for y in line_ys:
-                draw.line([int(35 * SCALE), y, PX_W - int(35 * SCALE), y], fill=lc, width=1)
+                draw.line([int(35 * SCALE), y, PX_W - int(35 * SCALE), y], fill=lc, width=SS)
             for x in range(int(35 * SCALE), PX_W - int(35 * SCALE), line_spacing):
-                draw.line([x, CONTENT_TOP, x, CONTENT_BOT], fill=lc, width=1)
+                draw.line([x, CONTENT_TOP, x, CONTENT_BOT], fill=lc, width=SS)
         elif is_dotted:
             for y in line_ys:
                 for x in range(int(50 * SCALE), PX_W - int(35 * SCALE), line_spacing):
-                    r = max(1, int(1.2 * SCALE))
+                    r = max(SS, int(1.2 * SCALE))
                     draw.ellipse([x - r, y - r, x + r, y + r], fill=lc)
         else:
             for y in line_ys:
-                draw.line([int(35 * SCALE), y, PX_W - int(35 * SCALE), y], fill=lc, width=1)
+                draw.line([int(35 * SCALE), y, PX_W - int(35 * SCALE), y], fill=lc, width=SS)
+            # Margin line: thin vertical line (0.7pt in PDF)
             if mc:
                 draw.line([margin_x, CONTENT_TOP, margin_x, CONTENT_BOT],
-                          fill=mc, width=max(1, int(1.5 * SCALE)))
+                          fill=mc, width=SS)
 
         return img, draw
 
@@ -2614,15 +2633,16 @@ def create_handwritten_jpg(text: str, font_key: str,
         if not credit:
             return
         try:
-            cr_w = draw.textlength(credit, font=small_font)
-            draw.text((PX_W - cr_w - int(12 * SCALE), PX_H - int(18 * SCALE)),
+            tb = draw.textbbox((0, 0), credit, font=small_font)
+            cw = tb[2] - tb[0]
+            draw.text((PX_W - cw - int(12 * SCALE), PX_H - int(20 * SCALE)),
                       credit, font=small_font, fill=lc)
         except Exception:
             pass
 
-    # ── Word wrap ─────────────────────────────────────────────────────────────
+    # ── Word wrap (using super-sampled font metrics) ───────────────────────────
     max_line_w = PX_W - margin_x - int(45 * SCALE)
-    _tmp       = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    _tmp_draw  = ImageDraw.Draw(Image.new("RGB", (10, 10)))
 
     def _wrap(content: str) -> list:
         result = []
@@ -2635,10 +2655,10 @@ def create_handwritten_jpg(text: str, font_key: str,
             for word in words:
                 test = (line + " " + word).strip()
                 try:
-                    tb  = _tmp.textbbox((0, 0), test, font=body_font)
-                    w_  = tb[2] - tb[0]
+                    tb = _tmp_draw.textbbox((0, 0), test, font=body_font)
+                    w_ = tb[2] - tb[0]
                 except Exception:
-                    w_  = len(test) * font_size_px * 0.55
+                    w_ = len(test) * font_size_px * 0.55
                 if w_ < max_line_w:
                     line = test
                 else:
@@ -2649,34 +2669,37 @@ def create_handwritten_jpg(text: str, font_key: str,
         return result
 
     # ── Render pages ──────────────────────────────────────────────────────────
-    # KEY FIX: y_pos starts at TOP of content area, increments DOWN each line
     lines     = _wrap(text)
     pages_out = []
     img, draw = _make_page()
 
-    # First text line sits ON the first notebook line
-    y_pos  = CONTENT_TOP + line_spacing - font_size_px
+    first_line_y = CONTENT_TOP + line_spacing
+    # Text baseline sits ON the notebook line.
+    # In PIL: draw at (y_line - font_size_px) so text bottom ≈ line position.
+    y_pos  = first_line_y - font_size_px
     text_x = margin_x + int(6 * SCALE)
 
     for line in lines:
-        # New page when text would go below bottom margin
         if y_pos + font_size_px > CONTENT_BOT:
             _add_credit(draw)
+            # ── Downscale 2× → final size with LANCZOS (anti-aliasing) ────────
+            final = img.resize((FINAL_W, FINAL_H), Image.LANCZOS)
             buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=92)
+            final.save(buf, format="JPEG", quality=95, subsampling=0)
             pages_out.append(buf.getvalue())
             img, draw = _make_page()
-            y_pos = CONTENT_TOP + line_spacing - font_size_px
+            y_pos = first_line_y - font_size_px
 
         if line:
             try:
                 draw.text((text_x, y_pos), line, font=body_font, fill=tc)
             except Exception:
                 pass
-        y_pos += line_spacing   # move DOWN (increase y in PIL)
+        y_pos += line_spacing
 
     _add_credit(draw)
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=92)
+    final = img.resize((FINAL_W, FINAL_H), Image.LANCZOS)
+    buf   = io.BytesIO()
+    final.save(buf, format="JPEG", quality=95, subsampling=0)
     pages_out.append(buf.getvalue())
     return pages_out
